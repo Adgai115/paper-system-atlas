@@ -37,6 +37,11 @@ async function loadSpec(filePath: string) {
 
 async function renderCommand(args: Args): Promise<void> {
   const spec = await loadSpec(required(args, "spec"));
+  if (typeof args.layout === "string") {
+    if (!(["layered", "lanes", "radial"] as string[]).includes(args.layout)) throw new Error(`不支持的布局: ${args.layout}`);
+    spec.layout.mode = args.layout as "layered" | "lanes" | "radial";
+    spec.layout.direction = args.layout === "lanes" ? "vertical" : "horizontal";
+  }
   const formats = String(args.formats ?? "svg,png,excalidraw").split(",").map((item) => item.trim()).filter(Boolean) as OutputFormat[];
   const supported = new Set<OutputFormat>(["svg", "png", "jpg", "gif", "excalidraw"]);
   for (const format of formats) if (!supported.has(format)) throw new Error(`不支持的格式: ${format}`);
@@ -77,7 +82,7 @@ async function doctorCommand(): Promise<void> {
 }
 
 function usage(): void {
-  console.log(`纸上系统图谱 CLI\n\n命令:\n  render   生成 SVG/PNG/JPG/GIF/Excalidraw\n  validate 校验规格\n  doctor   检查 Windows 与运行环境\n\n示例:\n  paper-atlas render --spec examples/intelligent-collaboration.json --outdir outputs --basename demo --formats svg,png,jpg,gif,excalidraw --verify`);
+  console.log(`纸上系统图谱 CLI\n\n命令:\n  render   生成 SVG/PNG/JPG/GIF/Excalidraw，可用 --layout 覆盖布局\n  validate 校验规格\n  doctor   检查 Windows 与运行环境\n\n示例:\n  paper-atlas render --spec examples/intelligent-collaboration.json --outdir outputs --basename demo --layout radial --formats svg,png,jpg,gif,excalidraw --verify`);
 }
 
 async function main(): Promise<void> {

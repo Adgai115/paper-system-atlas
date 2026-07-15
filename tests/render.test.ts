@@ -48,6 +48,52 @@ test("分层、泳道和径向布局都保持节点在所属分区内", async ()
   }
 });
 
+test("三种布局的分区不重叠且连线避开非端点节点", async () => {
+  const base = await fixture();
+  for (const mode of ["layered", "lanes", "radial"] as const) {
+    const spec = structuredClone(base);
+    spec.layout.mode = mode;
+    spec.layout.direction = mode === "lanes" ? "vertical" : "horizontal";
+    const scene = buildScene(spec);
+    for (let left = 0; left < scene.groups.length; left += 1) {
+      for (let right = left + 1; right < scene.groups.length; right += 1) {
+        const a = scene.groups[left].box;
+        const b = scene.groups[right].box;
+        const overlaps = a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+        assert.equal(overlaps, false, `${mode}:group:${scene.groups[left].id}-${scene.groups[right].id}`);
+      }
+    }
+    for (const edge of scene.edges) {
+      const obstacles = scene.nodes.filter((node) => node.id !== edge.from && node.id !== edge.to);
+      for (let segment = 1; segment < edge.path.length; segment += 1) {
+        const from = edge.path[segment - 1];
+        const to = edge.path[segment];
+        const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
+        const samples = Math.max(2, Math.ceil(length / 5));
+        for (let index = 1; index < samples; index += 1) {
+          const t = index / samples;
+          const x = from[0] + (to[0] - from[0]) * t;
+          const y = from[1] + (to[1] - from[1]) * t;
+          for (const obstacle of obstacles) {
+            const inside = x > obstacle.box.x - 1 && x < obstacle.box.x + obstacle.box.width + 1 && y > obstacle.box.y - 1 && y < obstacle.box.y + obstacle.box.height + 1;
+            assert.equal(inside, false, `${mode}:${edge.from}->${edge.to}:穿过${obstacle.id}`);
+          }
+        }
+      }
+    }
+  }
+});
+
+test("长中文标题在高密度布局中会自动换行且不会产生无效坐标", async () => {
+  const spec = await fixture();
+  spec.groups[0].title = "多模态用户信号接入与上下文理解";
+  spec.nodes[0].title = "跨渠道对话消息归一化处理";
+  spec.nodes[0].description = "处理公众号、企业聊天、网页表单和语音转写产生的超长中文上下文说明";
+  const svg = renderSvg(buildScene(spec));
+  assert.match(svg, /<tspan/);
+  assert.doesNotMatch(svg, /NaN|Infinity/);
+});
+
 test("SVG 与 Excalidraw 保留中文内容和唯一元素 ID", async () => {
   const scene = buildScene(await fixture());
   const svg = renderSvg(scene, { animatedSvg: true });

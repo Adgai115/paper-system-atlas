@@ -11,6 +11,14 @@
 ./scripts/render-example.ps1
 ```
 
+生成分层、泳道和径向三种中文视觉回归样例：
+
+```powershell
+./scripts/render-visual-samples.ps1
+# 如需同时检查三种布局的动画：
+./scripts/render-visual-samples.ps1 -IncludeGif
+```
+
 也可以直接运行：
 
 ```powershell
@@ -30,6 +38,7 @@ node dist/src/cli.js render `
 - 内容描述与视觉布局分离。
 - SVG 是统一场景表达，Excalidraw 是必须支持的编辑出口。
 - 纸张、墨线和彩色水洗是默认风格，主题字段允许完全自定义。
+- 连线会在节点外寻找低冲突走廊，并以圆润手绘折线避开非端点节点。
 - Windows、中文路径与无 FFmpeg 环境是一等使用场景。
 
 ## 当前状态

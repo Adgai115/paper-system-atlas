@@ -13,10 +13,15 @@ function jitter(seed: string, amount: number, slot: number): number {
   return (value - Math.floor(value) - 0.5) * amount * 2;
 }
 
-function roughRect(box: Box, seed: string, amount: number): string {
+function roughRect(box: Box, seed: string, amount: number, radius = 18): string {
   const { x, y, width: w, height: h } = box;
-  const j = (slot: number) => jitter(seed, amount, slot).toFixed(2);
-  return `M ${x + Number(j(1))} ${y + Number(j(2))} Q ${x + w / 2} ${y + Number(j(3))} ${x + w + Number(j(4))} ${y + Number(j(5))} Q ${x + w + Number(j(6))} ${y + h / 2} ${x + w + Number(j(7))} ${y + h + Number(j(8))} Q ${x + w / 2} ${y + h + Number(j(9))} ${x + Number(j(10))} ${y + h + Number(j(11))} Q ${x + Number(j(12))} ${y + h / 2} ${x + Number(j(13))} ${y + Number(j(14))} Z`;
+  const r = Math.max(4, Math.min(radius, w / 4, h / 4));
+  const j = (slot: number) => jitter(seed, amount, slot);
+  return `M ${x + r + j(1)} ${y + j(2)} C ${x + w * 0.34} ${y + j(3)} ${x + w * 0.68} ${y + j(4)} ${x + w - r + j(5)} ${y + j(6)} Q ${x + w + j(7)} ${y + j(8)} ${x + w + j(9)} ${y + r + j(10)} C ${x + w + j(11)} ${y + h * 0.35} ${x + w + j(12)} ${y + h * 0.68} ${x + w + j(13)} ${y + h - r + j(14)} Q ${x + w + j(15)} ${y + h + j(16)} ${x + w - r + j(17)} ${y + h + j(18)} C ${x + w * 0.68} ${y + h + j(19)} ${x + w * 0.34} ${y + h + j(20)} ${x + r + j(21)} ${y + h + j(22)} Q ${x + j(23)} ${y + h + j(24)} ${x + j(25)} ${y + h - r + j(26)} C ${x + j(27)} ${y + h * 0.68} ${x + j(28)} ${y + h * 0.34} ${x + j(29)} ${y + r + j(30)} Q ${x + j(31)} ${y + j(32)} ${x + r + j(1)} ${y + j(2)} Z`;
+}
+
+function textUnits(value: string): number {
+  return [...value].reduce((sum, char) => sum + (/[^\x00-\xff]/.test(char) ? 1 : 0.56), 0);
 }
 
 function wrapText(text: string, maxUnits: number, maxLines = 3): string[] {
@@ -26,10 +31,9 @@ function wrapText(text: string, maxUnits: number, maxLines = 3): string[] {
   const separator = /[\u3400-\u9fff]/.test(source) ? "" : " ";
   const lines: string[] = [];
   let line = "";
-  const units = (value: string) => [...value].reduce((sum, char) => sum + (/[^\x00-\xff]/.test(char) ? 1 : 0.56), 0);
   for (const token of tokens) {
     const next = line ? `${line}${separator}${token}` : token;
-    if (line && units(next) > maxUnits) {
+    if (line && textUnits(next) > maxUnits) {
       lines.push(line);
       line = token;
       if (lines.length === maxLines - 1) break;
@@ -70,15 +74,39 @@ function icon(node: AtlasNode, x: number, y: number, color: string): string {
   return `<g transform="translate(${x} ${y})" ${common}>${shapes[kind] ?? shapes.document}</g>`;
 }
 
-function cubicPath(edge: LayoutEdge): string {
-  const [a, b, c, d] = edge.path;
-  return `M ${a[0]} ${a[1]} C ${b[0]} ${b[1]} ${c[0]} ${c[1]} ${d[0]} ${d[1]}`;
+function smoothPath(edge: LayoutEdge): string {
+  const points = edge.path;
+  if (points.length < 2) return "";
+  let result = `M ${points[0][0]} ${points[0][1]}`;
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const previous = points[index - 1];
+    const current = points[index];
+    const next = points[index + 1];
+    const inLength = Math.hypot(current[0] - previous[0], current[1] - previous[1]);
+    const outLength = Math.hypot(next[0] - current[0], next[1] - current[1]);
+    const radius = Math.min(42, inLength * 0.34, outLength * 0.34);
+    const entry: [number, number] = [current[0] + (previous[0] - current[0]) * radius / Math.max(1, inLength), current[1] + (previous[1] - current[1]) * radius / Math.max(1, inLength)];
+    const exit: [number, number] = [current[0] + (next[0] - current[0]) * radius / Math.max(1, outLength), current[1] + (next[1] - current[1]) * radius / Math.max(1, outLength)];
+    result += ` L ${entry[0]} ${entry[1]} Q ${current[0]} ${current[1]} ${exit[0]} ${exit[1]}`;
+  }
+  const last = points[points.length - 1];
+  return `${result} L ${last[0]} ${last[1]}`;
 }
 
-function cubicPoint(edge: LayoutEdge, t: number): [number, number] {
-  const [p0, p1, p2, p3] = edge.path;
-  const u = 1 - t;
-  return [u ** 3 * p0[0] + 3 * u ** 2 * t * p1[0] + 3 * u * t ** 2 * p2[0] + t ** 3 * p3[0], u ** 3 * p0[1] + 3 * u ** 2 * t * p1[1] + 3 * u * t ** 2 * p2[1] + t ** 3 * p3[1]];
+function pathPoint(edge: LayoutEdge, t: number): [number, number] {
+  const lengths = edge.path.slice(1).map((point, index) => Math.hypot(point[0] - edge.path[index][0], point[1] - edge.path[index][1]));
+  const total = lengths.reduce((sum, length) => sum + length, 0);
+  let distance = Math.max(0, Math.min(1, t)) * total;
+  for (let index = 0; index < lengths.length; index += 1) {
+    if (distance <= lengths[index] || index === lengths.length - 1) {
+      const ratio = lengths[index] ? distance / lengths[index] : 0;
+      const from = edge.path[index];
+      const to = edge.path[index + 1];
+      return [from[0] + (to[0] - from[0]) * ratio, from[1] + (to[1] - from[1]) * ratio];
+    }
+    distance -= lengths[index];
+  }
+  return edge.path[edge.path.length - 1];
 }
 
 export function renderSvg(scene: Scene, options: RenderOptions = {}): string {
@@ -87,22 +115,27 @@ export function renderSvg(scene: Scene, options: RenderOptions = {}): string {
   const theme = spec.theme;
   const hand = Math.max(0.2, theme.handDrawn) * 3.5;
   const defs = `<defs>
-    <filter id="paperNoise" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="3" seed="13"/><feColorMatrix values="0 0 0 0 0.45 0 0 0 0 0.38 0 0 0 0 0.25 0 0 0 ${0.08 * theme.texture} 0"/></filter>
-    <filter id="softWash" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="7"/></filter>
+    <filter id="paperNoise" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.013 0.42" numOctaves="4" seed="13" result="grain"/><feColorMatrix in="grain" values="0 0 0 0 0.43 0 0 0 0 0.34 0 0 0 0 0.22 0 0 0 ${0.16 * theme.texture} 0"/></filter>
+    <filter id="watercolor" x="-25%" y="-25%" width="150%" height="150%"><feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="29" result="washNoise"/><feDisplacementMap in="SourceGraphic" in2="washNoise" scale="13" xChannelSelector="R" yChannelSelector="B" result="warped"/><feGaussianBlur in="warped" stdDeviation="5.5"/></filter>
+    <filter id="softWash" x="-18%" y="-28%" width="136%" height="156%"><feGaussianBlur stdDeviation="4.5"/></filter>
+    <pattern id="paperFibers" width="180" height="96" patternUnits="userSpaceOnUse"><path d="M-12 18 C38 11 95 25 192 16 M-20 62 C54 71 112 53 198 64 M24 -8 C20 24 31 58 27 106 M137 -6 C143 34 130 69 141 104" fill="none" stroke="#7C684A" stroke-width="0.55" opacity="${(0.055 * theme.texture).toFixed(3)}"/><circle cx="72" cy="43" r="0.8" fill="#6F5B3F" opacity="${(0.13 * theme.texture).toFixed(3)}"/></pattern>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker>
   </defs>`;
 
-  const background = `<rect width="${width}" height="${height}" fill="${theme.paper}"/><rect width="${width}" height="${height}" filter="url(#paperNoise)" opacity="0.8"/>`;
+  const background = `<rect width="${width}" height="${height}" fill="${theme.paper}"/><rect width="${width}" height="${height}" filter="url(#paperNoise)" opacity="0.92"/><rect width="${width}" height="${height}" fill="url(#paperFibers)"/><g fill="none" stroke="#806B4B" opacity="0.08"><path d="M38 150 C310 142 615 161 895 149 S1338 146 1563 154"/><path d="M47 ${height - 54} C350 ${height - 61} 694 ${height - 47} 1012 ${height - 57} S1395 ${height - 49} 1550 ${height - 58}"/></g>`;
   const title = `<g><text x="64" y="68" fill="${theme.ink}" font-family="${xml(theme.titleFont)}" font-size="52" font-weight="700">${xml(spec.meta.title)}</text>${spec.meta.subtitle ? `<text x="66" y="108" fill="${theme.mutedInk}" font-family="${xml(theme.bodyFont)}" font-size="20">${xml(spec.meta.subtitle)}</text>` : ""}<path d="M64 124 C190 118 320 132 455 122" stroke="${theme.palette[0]}" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.8"/></g>`;
 
   const edgeSvg = scene.edges.map((edge, index) => {
-    const path = cubicPath(edge);
-    const base = `<path id="edge-${index}" d="${path}" fill="none" stroke="${edge.color}" stroke-width="2.4" stroke-opacity="0.64" marker-end="url(#arrow)" stroke-linecap="round"/>`;
-    const accent = `<path d="${path}" fill="none" stroke="${edge.color}" stroke-width="1.2" stroke-dasharray="2 8" stroke-opacity="0.8"/>`;
+    const path = smoothPath(edge);
+    const start = edge.path[0];
+    const end = edge.path[edge.path.length - 1];
+    const ports = `<circle cx="${start[0]}" cy="${start[1]}" r="6.2" fill="${theme.paper}" stroke="${edge.color}" stroke-width="2"/><circle cx="${end[0]}" cy="${end[1]}" r="4.7" fill="${theme.paper}" stroke="${edge.color}" stroke-width="1.7"/>`;
+    const base = `<path id="edge-${index}" d="${path}" fill="none" stroke="${edge.color}" stroke-width="4.8" stroke-opacity="0.09" stroke-linecap="round"/><path d="${path}" fill="none" stroke="${edge.color}" stroke-width="2.35" stroke-opacity="0.72" marker-end="url(#arrow)" stroke-linecap="round" stroke-linejoin="round"/>`;
+    const accent = `<path d="${path}" fill="none" stroke="${edge.color}" stroke-width="0.95" stroke-dasharray="1 8" stroke-opacity="0.72"/>${ports}`;
     if (!edge.animated) return base + accent;
     if (options.animatedSvg) return `${base}${accent}<circle r="5" fill="${edge.color}"><animateMotion dur="3.2s" begin="${(index % 7) * -0.37}s" repeatCount="indefinite" path="${path}"/></circle>`;
     if (options.frameProgress !== undefined) {
-      const point = cubicPoint(edge, (options.frameProgress + index * 0.113) % 1);
+      const point = pathPoint(edge, (options.frameProgress + index * 0.113) % 1);
       return `${base}${accent}<circle cx="${point[0]}" cy="${point[1]}" r="7" fill="${edge.color}" opacity="0.22"/><circle cx="${point[0]}" cy="${point[1]}" r="3.2" fill="${edge.color}"/>`;
     }
     return base + accent;
@@ -112,23 +145,29 @@ export function renderSvg(scene: Scene, options: RenderOptions = {}): string {
     const b = group.box;
     const lane = spec.layout.mode === "lanes" || spec.layout.direction === "vertical";
     const wash = { x: b.x - 4, y: b.y - 4, width: b.width + 8, height: b.height + 8 };
-    return `<g id="group-${xml(group.id)}"><path d="${roughRect(wash, `${group.id}-wash`, hand * 1.8)}" fill="${group.color}" opacity="0.075" filter="url(#softWash)"/><path d="${roughRect(b, group.id, hand)}" fill="${group.color}" fill-opacity="0.055" stroke="${group.color}" stroke-width="2" stroke-dasharray="7 5"/><circle cx="${b.x + 25}" cy="${b.y + 29}" r="18" fill="${theme.paper}" stroke="${group.color}" stroke-width="2"/><text x="${b.x + 25}" y="${b.y + 36}" text-anchor="middle" fill="${group.color}" font-family="${xml(theme.titleFont)}" font-size="22" font-weight="700">${group.index + 1}</text><text x="${b.x + 54}" y="${b.y + 38}" fill="${group.color}" font-family="${xml(theme.titleFont)}" font-size="27" font-weight="700">${xml(group.title)}</text>${group.note ? `<text x="${lane ? b.x + Math.min(230, b.width * 0.25) : b.x + 22}" y="${lane ? b.y + 36 : b.y + 62}" fill="${theme.mutedInk}" font-family="${xml(theme.bodyFont)}" font-size="12">${xml(group.note)}</text>` : ""}</g>`;
+    const groupTitleSize = Math.max(19, Math.min(27, (b.width - 84) / Math.max(2.5, textUnits(group.title))));
+    return `<g id="group-${xml(group.id)}"><path d="${roughRect(wash, `${group.id}-wash-a`, hand * 2.4, 28)}" fill="${group.color}" opacity="0.105" filter="url(#watercolor)"/><path d="${roughRect({ x: wash.x + 7, y: wash.y + 5, width: wash.width - 11, height: wash.height - 8 }, `${group.id}-wash-b`, hand * 2.9, 34)}" fill="${group.color}" opacity="0.045" filter="url(#softWash)"/><path d="${roughRect(b, group.id, hand * 1.08, 26)}" fill="${group.color}" fill-opacity="0.035" stroke="${group.color}" stroke-width="1.8" stroke-dasharray="8 5"/><path d="${roughRect({ x: b.x + 3, y: b.y + 2, width: b.width - 6, height: b.height - 4 }, `${group.id}-echo`, hand * 0.72, 25)}" fill="none" stroke="${group.color}" stroke-width="0.65" opacity="0.28"/><circle cx="${b.x + 25}" cy="${b.y + 29}" r="18" fill="${theme.paper}" fill-opacity="0.78" stroke="${group.color}" stroke-width="2"/><circle cx="${b.x + 25.8}" cy="${b.y + 28.3}" r="20.5" fill="none" stroke="${group.color}" stroke-width="0.7" opacity="0.32"/><text x="${b.x + 25}" y="${b.y + 36}" text-anchor="middle" fill="${group.color}" font-family="${xml(theme.titleFont)}" font-size="22" font-weight="700">${group.index + 1}</text><text x="${b.x + 54}" y="${b.y + 38}" fill="${group.color}" font-family="${xml(theme.titleFont)}" font-size="${groupTitleSize}" font-weight="700">${xml(group.title)}</text>${group.note ? `<text x="${lane ? b.x + Math.min(230, b.width * 0.25) : b.x + 22}" y="${lane ? b.y + 36 : b.y + 62}" fill="${theme.mutedInk}" font-family="${xml(theme.bodyFont)}" font-size="12">${xml(group.note)}</text>` : ""}</g>`;
   }).join("");
 
   const nodes = scene.nodes.map((node) => {
     const b = node.box;
     const group = scene.groups.find((item) => item.id === node.group)!;
     const color = node.color ?? group.color;
-    const titleSize = b.width < 220 ? 17 : 20;
+    const titleArea = Math.max(54, b.width - 88);
+    const titleSize = Math.max(14, Math.min(b.width < 220 ? 17 : 20, titleArea / Math.max(2.4, textUnits(node.title))));
     const descriptionSize = b.width < 220 ? 11 : 13;
     const titleX = b.x + 70;
-    const titleY = b.y + Math.min(35, b.height * 0.36);
-    const desc = wrapText(node.description ?? "", Math.max(7, (b.width - 86) / (descriptionSize * 0.86)), b.height < 92 ? 2 : 3);
+    const titleLines = wrapText(node.title, Math.max(3, titleArea / Math.max(14, titleSize)), 2);
+    const titleY = b.y + Math.min(32, b.height * 0.32);
+    const descriptionY = titleY + titleLines.length * (titleSize + 1) + 4;
+    const availableDescription = b.y + b.height - descriptionY - 8;
+    const maxDescriptionLines = Math.max(0, Math.min(3, Math.floor(availableDescription / 16) + 1));
+    const desc = wrapText(node.description ?? "", Math.max(7, (b.width - 86) / (descriptionSize * 0.86)), maxDescriptionLines);
     const angle = jitter(node.id, 0.34, 90).toFixed(3);
     const cx = b.x + b.width / 2;
     const cy = b.y + b.height / 2;
     const washBox = { x: b.x - 5, y: b.y - 4, width: b.width + 10, height: b.height + 8 };
-    return `<g id="node-${xml(node.id)}" transform="rotate(${angle} ${cx} ${cy})"><path d="${roughRect(washBox, `${node.id}-wash`, hand * 1.1)}" fill="${color}" opacity="0.09" filter="url(#softWash)"/><path d="${roughRect(b, node.id, hand * 0.9)}" fill="${theme.paper}" fill-opacity="0.72" stroke="${color}" stroke-width="2.25"/><path d="${roughRect({ x: b.x + 3, y: b.y + 3, width: b.width - 6, height: b.height - 6 }, `${node.id}-inner`, hand * 0.58)}" fill="${color}" fill-opacity="0.025" stroke="${color}" stroke-width="0.9" opacity="0.42"/>${icon(node, b.x + 16, b.y + Math.max(12, b.height / 2 - 21), color)}<text x="${titleX}" y="${titleY}" fill="${theme.ink}" font-family="${xml(theme.bodyFont)}" font-size="${titleSize}" font-weight="700">${xml(node.title)}</text>${textLines(desc, titleX, titleY + 23, 17, `fill="${theme.mutedInk}" font-family="${xml(theme.bodyFont)}" font-size="${descriptionSize}"`)}</g>`;
+    return `<g id="node-${xml(node.id)}" transform="rotate(${angle} ${cx} ${cy})"><path d="${roughRect(washBox, `${node.id}-wash-a`, hand * 1.65, 22)}" fill="${color}" opacity="0.115" filter="url(#softWash)"/><path d="${roughRect({ x: washBox.x + 5, y: washBox.y - 1, width: washBox.width - 8, height: washBox.height + 2 }, `${node.id}-wash-b`, hand * 2.1, 25)}" fill="${color}" opacity="0.052" filter="url(#softWash)"/><path d="${roughRect(b, node.id, hand * 1.02, 17)}" fill="${theme.paper}" fill-opacity="0.76" stroke="${color}" stroke-width="2.15"/><path d="${roughRect({ x: b.x + 3, y: b.y + 3, width: b.width - 6, height: b.height - 6 }, `${node.id}-inner`, hand * 0.64, 14)}" fill="${color}" fill-opacity="0.022" stroke="${color}" stroke-width="0.82" opacity="0.48"/>${icon(node, b.x + 16, b.y + Math.max(12, b.height / 2 - 21), color)}${textLines(titleLines, titleX, titleY, titleSize + 2, `fill="${theme.ink}" font-family="${xml(theme.bodyFont)}" font-size="${titleSize}" font-weight="700"`)}${textLines(desc, titleX, descriptionY, 16, `fill="${theme.mutedInk}" font-family="${xml(theme.bodyFont)}" font-size="${descriptionSize}"`)}</g>`;
   }).join("");
 
   const notePositions: Record<string, [number, number, string]> = {

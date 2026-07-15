@@ -11,6 +11,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/cli.ts",
     "render:example": "tsx src/cli.ts render --spec examples/intelligent-collaboration.json --outdir outputs --basename intelligent-collaboration --formats svg,png,jpg,gif,excalidraw --verify",
+    "render:visuals": "powershell -ExecutionPolicy Bypass -File scripts/render-visual-samples.ps1",
     "test": "node --import tsx --test tests/*.test.ts",
     "check": "npm run build && npm test"
   },

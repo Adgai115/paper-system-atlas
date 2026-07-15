@@ -43,16 +43,46 @@ function radialGroups(spec: AtlasSpec): LayoutGroup[] {
   const cx = spec.canvas.width / 2;
   const cy = spec.canvas.height / 2 + 42;
   const count = spec.groups.length;
-  const boxWidth = Math.min(360, spec.canvas.width * 0.24);
-  const boxHeight = Math.min(260, spec.canvas.height * 0.3);
-  const rx = Math.max(boxWidth * 0.9, spec.canvas.width * 0.31);
-  const ry = Math.max(boxHeight * 0.66, spec.canvas.height * 0.2);
-  return spec.groups.map((group, index) => {
+  const boxWidth = Math.min(340, Math.max(210, spec.canvas.width * (count > 6 ? 0.17 : count > 4 ? 0.2 : 0.22)));
+  const boxHeight = Math.min(238, Math.max(148, (spec.canvas.height - 226) / Math.max(2.8, Math.ceil(count / 2))));
+  const rx = Math.max(boxWidth * 0.92, spec.canvas.width / 2 - boxWidth / 2 - 66);
+  const ry = Math.max(boxHeight * 0.7, spec.canvas.height / 2 - boxHeight / 2 - 104);
+  const result = spec.groups.map((group, index) => {
     const angle = -Math.PI * 0.75 + (Math.PI * 2 * index) / count;
     const x = Math.max(32, Math.min(spec.canvas.width - boxWidth - 32, cx + Math.cos(angle) * rx - boxWidth / 2));
     const y = Math.max(150, Math.min(spec.canvas.height - boxHeight - 42, cy + Math.sin(angle) * ry - boxHeight / 2));
     return { ...group, index, color: groupColor(spec, group, index), box: { x, y, width: boxWidth, height: boxHeight } };
   });
+
+  // Radial labels are placed on an ellipse and then gently repelled. This keeps
+  // dense 5-8 group diagrams readable without giving up the radial silhouette.
+  for (let pass = 0; pass < 80; pass += 1) {
+    for (let left = 0; left < result.length; left += 1) {
+      for (let right = left + 1; right < result.length; right += 1) {
+        const a = result[left].box;
+        const b = result[right].box;
+        const overlapX = Math.min(a.x + a.width + 14, b.x + b.width + 14) - Math.max(a.x - 14, b.x - 14);
+        const overlapY = Math.min(a.y + a.height + 14, b.y + b.height + 14) - Math.max(a.y - 14, b.y - 14);
+        if (overlapX <= 0 || overlapY <= 0) continue;
+        if (overlapX < overlapY) {
+          const shift = overlapX / 2 + 0.5;
+          const direction = a.x + a.width / 2 < b.x + b.width / 2 ? -1 : 1;
+          a.x += direction * shift;
+          b.x -= direction * shift;
+        } else {
+          const shift = overlapY / 2 + 0.5;
+          const direction = a.y + a.height / 2 < b.y + b.height / 2 ? -1 : 1;
+          a.y += direction * shift;
+          b.y -= direction * shift;
+        }
+        a.x = Math.max(32, Math.min(spec.canvas.width - a.width - 32, a.x));
+        b.x = Math.max(32, Math.min(spec.canvas.width - b.width - 32, b.x));
+        a.y = Math.max(150, Math.min(spec.canvas.height - a.height - 42, a.y));
+        b.y = Math.max(150, Math.min(spec.canvas.height - b.height - 42, b.y));
+      }
+    }
+  }
+  return result;
 }
 
 function layoutNodesInGroup(group: LayoutGroup, nodes: AtlasNode[], laneMode: boolean, radialMode: boolean): LayoutNode[] {
@@ -101,30 +131,157 @@ function seedWave(value: string, magnitude: number): number {
   return (((Math.abs(seed) % 1000) / 999) - 0.5) * magnitude * 2;
 }
 
-function connectionPath(from: Box, to: Box, key: string, feedback = false): [number, number][] {
-  const fromCenter = [from.x + from.width / 2, from.y + from.height / 2] as [number, number];
-  const toCenter = [to.x + to.width / 2, to.y + to.height / 2] as [number, number];
+type Point = [number, number];
+
+function anchor(box: Box, side: "left" | "right" | "top" | "bottom"): Point {
+  if (side === "left") return [box.x, box.y + box.height / 2];
+  if (side === "right") return [box.x + box.width, box.y + box.height / 2];
+  if (side === "top") return [box.x + box.width / 2, box.y];
+  return [box.x + box.width / 2, box.y + box.height];
+}
+
+function compactPath(points: Point[]): Point[] {
+  return points.filter((point, index) => {
+    if (index === 0) return true;
+    const previous = points[index - 1];
+    return Math.abs(point[0] - previous[0]) > 0.1 || Math.abs(point[1] - previous[1]) > 0.1;
+  }).filter((point, index, all) => {
+    if (index === 0 || index === all.length - 1) return true;
+    const previous = all[index - 1];
+    const next = all[index + 1];
+    return !((previous[0] === point[0] && point[0] === next[0]) || (previous[1] === point[1] && point[1] === next[1]));
+  });
+}
+
+function pointInside(point: Point, box: Box, padding = 0): boolean {
+  return point[0] > box.x - padding && point[0] < box.x + box.width + padding && point[1] > box.y - padding && point[1] < box.y + box.height + padding;
+}
+
+function pathScore(path: Point[], obstacles: Box[], previous: Point[][], width: number, height: number): number {
+  let score = 0;
+  for (let segment = 1; segment < path.length; segment += 1) {
+    const a = path[segment - 1];
+    const b = path[segment];
+    const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    score += length;
+    const samples = Math.max(2, Math.ceil(length / 8));
+    for (let index = 1; index < samples; index += 1) {
+      const t = index / samples;
+      const point: Point = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      if (point[0] < 18 || point[0] > width - 18 || point[1] < 142 || point[1] > height - 24) score += 12_000;
+      for (const obstacle of obstacles) if (pointInside(point, obstacle, 10)) score += 40_000;
+      for (const used of previous) {
+        for (let usedSegment = 1; usedSegment < used.length; usedSegment += 1) {
+          const u = used[usedSegment - 1];
+          const v = used[usedSegment];
+          const minX = Math.min(u[0], v[0]) - 5;
+          const maxX = Math.max(u[0], v[0]) + 5;
+          const minY = Math.min(u[1], v[1]) - 5;
+          const maxY = Math.max(u[1], v[1]) + 5;
+          if (point[0] >= minX && point[0] <= maxX && point[1] >= minY && point[1] <= maxY) score += 14;
+        }
+      }
+    }
+  }
+  score += Math.max(0, path.length - 2) * 18;
+  return score;
+}
+
+function connectionPath(from: Box, to: Box, key: string, obstacles: Box[], previous: Point[][], canvas: Box, feedback = false): Point[] {
+  const fromCenter: Point = [from.x + from.width / 2, from.y + from.height / 2];
+  const toCenter: Point = [to.x + to.width / 2, to.y + to.height / 2];
+  const wave = seedWave(key, 16);
+  const candidates: Point[][] = [];
+  const horizontal = (corridorX: number): Point[] => {
+    const start = anchor(from, corridorX >= fromCenter[0] ? "right" : "left");
+    const end = anchor(to, corridorX >= toCenter[0] ? "right" : "left");
+    return compactPath([start, [corridorX, start[1]], [corridorX, end[1]], end]);
+  };
+  const vertical = (corridorY: number): Point[] => {
+    const start = anchor(from, corridorY >= fromCenter[1] ? "bottom" : "top");
+    const end = anchor(to, corridorY >= toCenter[1] ? "bottom" : "top");
+    return compactPath([start, [start[0], corridorY], [end[0], corridorY], end]);
+  };
+  const lead = (box: Box, side: "left" | "right" | "top" | "bottom", distance = 14): Point => {
+    const point = anchor(box, side);
+    if (side === "left") return [point[0] - distance, point[1]];
+    if (side === "right") return [point[0] + distance, point[1]];
+    if (side === "top") return [point[0], point[1] - distance];
+    return [point[0], point[1] + distance];
+  };
+
+  const midpointX = (fromCenter[0] + toCenter[0]) / 2;
+  const midpointY = (fromCenter[1] + toCenter[1]) / 2;
+  for (const offset of [0, wave, -wave, 34, -34, 68, -68]) {
+    candidates.push(horizontal(midpointX + offset));
+    candidates.push(vertical(midpointY + offset));
+  }
+  const leftX = Math.max(28, Math.min(from.x, to.x) - 30 - Math.abs(wave));
+  const rightX = Math.min(canvas.width - 28, Math.max(from.x + from.width, to.x + to.width) + 30 + Math.abs(wave));
+  const topY = Math.max(146, Math.min(from.y, to.y) - 28 - Math.abs(wave));
+  const bottomY = Math.min(canvas.height - 30, Math.max(from.y + from.height, to.y + to.height) + 28 + Math.abs(wave));
+  const nearLeftX = Math.max(22, Math.min(from.x, to.x) - 12);
+  const nearRightX = Math.min(canvas.width - 22, Math.max(from.x + from.width, to.x + to.width) + 12);
+  const nearTopY = Math.max(144, Math.min(from.y, to.y) - 12);
+  const nearBottomY = Math.min(canvas.height - 24, Math.max(from.y + from.height, to.y + to.height) + 12);
+  candidates.push(horizontal(leftX), horizontal(rightX), horizontal(nearLeftX), horizontal(nearRightX), vertical(topY), vertical(bottomY), vertical(nearTopY), vertical(nearBottomY));
+
+  const corridorYs = [topY, bottomY, nearTopY, nearBottomY, 148, canvas.height - 28, ...obstacles.flatMap((box) => [box.y - 12, box.y + box.height + 12])]
+    .filter((value, index, all) => value >= 144 && value <= canvas.height - 24 && all.findIndex((item) => Math.abs(item - value) < 1) === index)
+    .sort((a, b) => {
+      const occupied = (value: number) => obstacles.filter((box) => value > box.y - 10 && value < box.y + box.height + 10).length;
+      return occupied(a) * 100_000 + Math.abs(a - midpointY) - occupied(b) * 100_000 - Math.abs(b - midpointY);
+    }).slice(0, 6);
+  const corridorXs = [leftX, rightX, nearLeftX, nearRightX, 24, canvas.width - 24, ...obstacles.flatMap((box) => [box.x - 12, box.x + box.width + 12])]
+    .filter((value, index, all) => value >= 20 && value <= canvas.width - 20 && all.findIndex((item) => Math.abs(item - value) < 1) === index)
+    .sort((a, b) => {
+      const occupied = (value: number) => obstacles.filter((box) => value > box.x - 10 && value < box.x + box.width + 10).length;
+      return occupied(a) * 100_000 + Math.abs(a - midpointX) - occupied(b) * 100_000 - Math.abs(b - midpointX);
+    }).slice(0, 6);
+  for (const corridorY of corridorYs) {
+    for (const startSide of ["left", "right"] as const) {
+      for (const endSide of ["left", "right"] as const) {
+        const start = anchor(from, startSide);
+        const startLead = lead(from, startSide);
+        const end = anchor(to, endSide);
+        const endLead = lead(to, endSide);
+        candidates.push(compactPath([start, startLead, [startLead[0], corridorY], [endLead[0], corridorY], endLead, end]));
+      }
+    }
+  }
+  for (const corridorX of corridorXs) {
+    for (const startSide of ["top", "bottom"] as const) {
+      for (const endSide of ["top", "bottom"] as const) {
+        const start = anchor(from, startSide);
+        const startLead = lead(from, startSide);
+        const end = anchor(to, endSide);
+        const endLead = lead(to, endSide);
+        candidates.push(compactPath([start, startLead, [corridorX, startLead[1]], [corridorX, endLead[1]], endLead, end]));
+      }
+    }
+  }
+  for (const outerX of [leftX, rightX]) {
+    for (const outerY of [topY, bottomY]) {
+      const startSide = outerX >= fromCenter[0] ? "right" : "left";
+      const endSide = outerY >= toCenter[1] ? "bottom" : "top";
+      const start = anchor(from, startSide);
+      const end = anchor(to, endSide);
+      candidates.push(compactPath([start, [outerX, start[1]], [outerX, outerY], [end[0], outerY], end]));
+
+      const alternateStartSide = outerY >= fromCenter[1] ? "bottom" : "top";
+      const alternateEndSide = outerX >= toCenter[0] ? "right" : "left";
+      const alternateStart = anchor(from, alternateStartSide);
+      const alternateEnd = anchor(to, alternateEndSide);
+      candidates.push(compactPath([alternateStart, [alternateStart[0], outerY], [outerX, outerY], [outerX, alternateEnd[1]], alternateEnd]));
+    }
+  }
+
   if (feedback) {
-    const start: [number, number] = [from.x, fromCenter[1]];
-    const end: [number, number] = [to.x, toCenter[1]];
-    const outsideX = Math.min(from.x, to.x) - 34 - Math.abs(seedWave(key, 15));
-    return [start, [outsideX, start[1]], [outsideX, end[1]], end];
+    // Feedback loops should visibly leave the normal forward-flow corridor.
+    const preferred = fromCenter[0] + toCenter[0] < canvas.width ? horizontal(leftX) : horizontal(rightX);
+    candidates.unshift(preferred);
   }
-  const dx = toCenter[0] - fromCenter[0];
-  const dy = toCenter[1] - fromCenter[1];
-  if (Math.abs(dx) >= Math.abs(dy)) {
-    const dir = Math.sign(dx) || 1;
-    const start: [number, number] = [fromCenter[0] + dir * from.width / 2, fromCenter[1]];
-    const end: [number, number] = [toCenter[0] - dir * to.width / 2, toCenter[1]];
-    const bend = Math.max(34, Math.abs(end[0] - start[0]) * 0.46);
-    const wave = seedWave(key, Math.min(48, Math.max(12, Math.abs(end[0] - start[0]) * 0.2)));
-    return [start, [start[0] + dir * bend, start[1] + wave], [end[0] - dir * bend, end[1] - wave * 0.55], end];
-  }
-  const dir = Math.sign(dy) || 1;
-  const start: [number, number] = [fromCenter[0], fromCenter[1] + dir * from.height / 2];
-  const end: [number, number] = [toCenter[0], toCenter[1] - dir * to.height / 2];
-  const bend = Math.max(30, Math.abs(end[1] - start[1]) * 0.46);
-  return [start, [start[0], start[1] + dir * bend], [end[0], end[1] - dir * bend], end];
+  return candidates.map(compactPath).sort((a, b) => pathScore(a, obstacles, previous, canvas.width, canvas.height) - pathScore(b, obstacles, previous, canvas.width, canvas.height))[0];
 }
 
 export function buildScene(spec: AtlasSpec): Scene {
@@ -134,11 +291,19 @@ export function buildScene(spec: AtlasSpec): Scene {
   const nodes = groups.flatMap((group) => layoutNodesInGroup(group, spec.nodes.filter((node) => node.group === group.id), laneMode, radialMode));
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   const groupMap = new Map(groups.map((group) => [group.id, group]));
+  const routed: Point[][] = [];
   const edges: LayoutEdge[] = spec.edges.map((edge) => {
     const from = nodeMap.get(edge.from)!;
     const to = nodeMap.get(edge.to)!;
     const fallback = groupMap.get(from.group)?.color ?? spec.theme.ink;
-    return { ...edge, color: edge.color ?? fallback, path: connectionPath(from.box, to.box, `${edge.from}-${edge.to}`, edge.kind === "feedback") };
+    const obstacles = [
+      ...nodes.filter((node) => node.id !== from.id && node.id !== to.id).map((node) => node.box),
+      ...groups.map((group) => ({ x: group.box.x, y: group.box.y, width: laneMode ? Math.min(400, group.box.width) : group.box.width, height: Math.min(68, group.box.height) })),
+      { x: 42, y: 20, width: Math.min(520, spec.canvas.width * 0.5), height: 116 },
+    ];
+    const path = connectionPath(from.box, to.box, `${edge.from}-${edge.to}`, obstacles, routed, { x: 0, y: 0, width: spec.canvas.width, height: spec.canvas.height }, edge.kind === "feedback");
+    routed.push(path);
+    return { ...edge, color: edge.color ?? fallback, path };
   });
   return { spec, groups, nodes, edges };
 }

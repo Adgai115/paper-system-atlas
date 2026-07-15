@@ -66,15 +66,7 @@ export function renderExcalidraw(scene: Scene): string {
   }
 
   for (const edge of scene.edges) {
-    const [start, c1, c2, end] = edge.path;
-    const samples: [number, number][] = Array.from({ length: 9 }, (_, index) => {
-      const t = index / 8;
-      const u = 1 - t;
-      return [
-        u ** 3 * start[0] + 3 * u ** 2 * t * c1[0] + 3 * u * t ** 2 * c2[0] + t ** 3 * end[0],
-        u ** 3 * start[1] + 3 * u ** 2 * t * c1[1] + 3 * u * t ** 2 * c2[1] + t ** 3 * end[1],
-      ];
-    });
+    const samples = edge.path;
     const minX = Math.min(...samples.map(([x]) => x));
     const minY = Math.min(...samples.map(([, y]) => y));
     const maxX = Math.max(...samples.map(([x]) => x));

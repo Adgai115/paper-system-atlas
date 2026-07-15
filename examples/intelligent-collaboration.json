@@ -18,20 +18,20 @@
   },
   "theme": {
     "name": "paper-color",
-    "paper": "#F5EEDC",
-    "ink": "#17304F",
-    "mutedInk": "#5E665F",
-    "palette": ["#D95F45", "#26877F", "#3568B0", "#D08E2E", "#8260A6"],
+    "paper": "#F6EEDD",
+    "ink": "#243B56",
+    "mutedInk": "#5F625E",
+    "palette": ["#CC654B", "#2D8585", "#3569A7", "#C18A37", "#7567A2"],
     "titleFont": "STKaiti, KaiTi, serif",
-    "bodyFont": "Microsoft YaHei, Noto Sans CJK SC, sans-serif",
-    "texture": 0.38,
-    "handDrawn": 0.78
+    "bodyFont": "STKaiti, KaiTi, Microsoft YaHei, Noto Sans CJK SC, serif",
+    "texture": 0.52,
+    "handDrawn": 0.9
   },
   "groups": [
-    { "id": "input", "title": "输入", "note": "捕捉信号，理解上下文", "color": "#D95F45" },
-    { "id": "orchestration", "title": "编排", "note": "规划路径，验证结果", "color": "#26877F" },
-    { "id": "specialists", "title": "专家能力", "note": "并行、安全、可靠", "color": "#3568B0" },
-    { "id": "delivery", "title": "交付", "note": "以合适的形式抵达", "color": "#D08E2E" }
+    { "id": "input", "title": "输入", "note": "捕捉信号，理解上下文", "color": "#CC654B" },
+    { "id": "orchestration", "title": "编排", "note": "规划路径，验证结果", "color": "#2D8585" },
+    { "id": "specialists", "title": "专家能力", "note": "并行、安全、可靠", "color": "#3569A7" },
+    { "id": "delivery", "title": "交付", "note": "以合适的形式抵达", "color": "#C18A37" }
   ],
   "nodes": [
     { "id": "chat", "group": "input", "title": "对话", "description": "消息、话题、提及", "icon": "chat" },
@@ -67,10 +67,10 @@
     { "from": "knowledge", "to": "message", "kind": "result" },
     { "from": "code", "to": "dashboard", "kind": "result" },
     { "from": "media", "to": "archive", "kind": "result" },
-    { "from": "verification", "to": "intent", "kind": "feedback", "color": "#8260A6" }
+    { "from": "verification", "to": "intent", "kind": "feedback", "color": "#7567A2" }
   ],
   "notes": [
-    { "text": "中文优先 · 内容驱动布局", "anchor": "top-right", "color": "#D95F45" },
-    { "text": "可编辑 SVG 与 Excalidraw", "anchor": "bottom-right", "color": "#3568B0" }
+    { "text": "中文优先 · 内容驱动布局", "anchor": "top-right", "color": "#CC654B" },
+    { "text": "可编辑 SVG 与 Excalidraw", "anchor": "bottom-right", "color": "#3569A7" }
   ]
 }

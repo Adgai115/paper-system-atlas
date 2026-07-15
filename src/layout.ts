@@ -9,6 +9,27 @@ function inset(box: Box, left: number, top: number, right = left, bottom = top):
 }
 
 function layeredGroups(spec: AtlasSpec): LayoutGroup[] {
+  if (spec.groups.length === 4 && spec.canvas.width >= 1200 && spec.canvas.height >= 760) {
+    const scaleX = spec.canvas.width / 1600;
+    const scaleY = spec.canvas.height / 900;
+    const blueprint = [
+      { x: 68, y: 260, width: 258, height: 480 },
+      { x: 458, y: 166, width: 304, height: 574 },
+      { x: 844, y: 142, width: 346, height: 598 },
+      { x: 1290, y: 255, width: 242, height: 485 },
+    ];
+    return spec.groups.map((group, index) => ({
+      ...group,
+      index,
+      color: groupColor(spec, group, index),
+      box: {
+        x: blueprint[index].x * scaleX,
+        y: blueprint[index].y * scaleY,
+        width: blueprint[index].width * scaleX,
+        height: blueprint[index].height * scaleY,
+      },
+    }));
+  }
   const marginX = Math.max(42, spec.canvas.width * 0.035);
   const top = 160;
   const bottom = 78;
@@ -284,6 +305,35 @@ function connectionPath(from: Box, to: Box, key: string, obstacles: Box[], previ
   return candidates.map(compactPath).sort((a, b) => pathScore(a, obstacles, previous, canvas.width, canvas.height) - pathScore(b, obstacles, previous, canvas.width, canvas.height))[0];
 }
 
+function atlasFlowPath(from: Box, to: Box, fromGroup: LayoutGroup, toGroup: LayoutGroup, key: string, canvas: Box): Point[] | undefined {
+  if (toGroup.index !== fromGroup.index + 1) return undefined;
+  const start = anchor(from, "right");
+  const end = anchor(to, "left");
+  const gap = toGroup.box.x - (fromGroup.box.x + fromGroup.box.width);
+  if (gap < 34) return undefined;
+  const wave = seedWave(key, 13);
+  if (fromGroup.index === 0 || fromGroup.index === 2) {
+    const hub: Point = [fromGroup.box.x + fromGroup.box.width + gap / 2, canvas.height * (fromGroup.index === 0 ? 0.51 : 0.49)];
+    return compactPath([
+      start,
+      [start[0] + 20, start[1]],
+      [hub[0] - 38 + wave, start[1] + (hub[1] - start[1]) * 0.72],
+      hub,
+      [hub[0] + 38 + wave * 0.4, end[1] + (hub[1] - end[1]) * 0.72],
+      [end[0] - 20, end[1]],
+      end,
+    ]);
+  }
+  const middleX = start[0] + gap / 2;
+  return compactPath([
+    start,
+    [start[0] + gap * 0.28, start[1]],
+    [middleX + wave, (start[1] + end[1]) / 2 + wave * 0.55],
+    [end[0] - gap * 0.28, end[1]],
+    end,
+  ]);
+}
+
 export function buildScene(spec: AtlasSpec): Scene {
   const laneMode = spec.layout.mode === "lanes" || spec.layout.direction === "vertical";
   const radialMode = spec.layout.mode === "radial";
@@ -295,13 +345,24 @@ export function buildScene(spec: AtlasSpec): Scene {
   const edges: LayoutEdge[] = spec.edges.map((edge) => {
     const from = nodeMap.get(edge.from)!;
     const to = nodeMap.get(edge.to)!;
-    const fallback = groupMap.get(from.group)?.color ?? spec.theme.ink;
+    const fromGroup = groupMap.get(from.group)!;
+    const toGroup = groupMap.get(to.group)!;
+    const nodeIndex = nodes.filter((node) => node.group === from.group).findIndex((node) => node.id === from.id);
+    let fallback = fromGroup.color ?? spec.theme.ink;
+    if (fromGroup.index === 0 && toGroup.index === 1) fallback = spec.theme.palette[0] ?? fallback;
+    else if (fromGroup.index === 1 && toGroup.index === 2) fallback = spec.theme.palette[nodeIndex % 2 === 0 ? 1 : 2] ?? fallback;
+    else if (fromGroup.index === 2 && toGroup.index === 3) fallback = spec.theme.palette[nodeIndex === 3 ? 3 : 4] ?? fallback;
+    else if (edge.kind === "feedback") fallback = spec.theme.palette[1] ?? fallback;
     const obstacles = [
       ...nodes.filter((node) => node.id !== from.id && node.id !== to.id).map((node) => node.box),
       ...groups.map((group) => ({ x: group.box.x, y: group.box.y, width: laneMode ? Math.min(400, group.box.width) : group.box.width, height: Math.min(68, group.box.height) })),
       { x: 42, y: 20, width: Math.min(520, spec.canvas.width * 0.5), height: 116 },
     ];
-    const path = connectionPath(from.box, to.box, `${edge.from}-${edge.to}`, obstacles, routed, { x: 0, y: 0, width: spec.canvas.width, height: spec.canvas.height }, edge.kind === "feedback");
+    const canvas = { x: 0, y: 0, width: spec.canvas.width, height: spec.canvas.height };
+    const authoredFlow = spec.layout.mode === "layered" && spec.groups.length === 4 && edge.kind !== "feedback"
+      ? atlasFlowPath(from.box, to.box, fromGroup, toGroup, `${edge.from}-${edge.to}`, canvas)
+      : undefined;
+    const path = authoredFlow ?? connectionPath(from.box, to.box, `${edge.from}-${edge.to}`, obstacles, routed, canvas, edge.kind === "feedback");
     routed.push(path);
     return { ...edge, color: edge.color ?? fallback, path };
   });

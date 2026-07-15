@@ -12,14 +12,14 @@ const canvasSchema = z.object({
 
 const themeSchema = z.object({
   name: z.string().default("paper-color"),
-  paper: color.default("#F5EEDC"),
-  ink: color.default("#17304F"),
-  mutedInk: color.default("#5E665F"),
-  palette: z.array(color).min(2).max(12).default(["#E36F51", "#2D8E87", "#3568B0", "#D49B37", "#8764A8"]),
+  paper: color.default("#F6EEDD"),
+  ink: color.default("#243B56"),
+  mutedInk: color.default("#5F625E"),
+  palette: z.array(color).min(2).max(12).default(["#CC654B", "#2D8585", "#3569A7", "#C18A37", "#7567A2"]),
   titleFont: z.string().default("STKaiti, KaiTi, serif"),
-  bodyFont: z.string().default("Microsoft YaHei, Noto Sans CJK SC, sans-serif"),
-  texture: z.number().min(0).max(1).default(0.35),
-  handDrawn: z.number().min(0).max(1).default(0.72),
+  bodyFont: z.string().default("STKaiti, KaiTi, Microsoft YaHei, Noto Sans CJK SC, serif"),
+  texture: z.number().min(0).max(1).default(0.52),
+  handDrawn: z.number().min(0).max(1).default(0.88),
 });
 
 const groupSchema = z.object({

@@ -1,0 +1,76 @@
+{
+  "$schema": "../schema/atlas-spec.schema.json",
+  "meta": {
+    "title": "系统图谱",
+    "subtitle": "智能协作平台 · 架构总览",
+    "description": "从用户信号到可信交付的专业系统架构图",
+    "language": "zh-CN"
+  },
+  "canvas": {
+    "width": 1600,
+    "height": 900,
+    "fps": 8,
+    "frames": 16
+  },
+  "layout": {
+    "mode": "layered",
+    "direction": "horizontal"
+  },
+  "theme": {
+    "name": "paper-color",
+    "paper": "#F5EEDC",
+    "ink": "#17304F",
+    "mutedInk": "#5E665F",
+    "palette": ["#D95F45", "#26877F", "#3568B0", "#D08E2E", "#8260A6"],
+    "titleFont": "STKaiti, KaiTi, serif",
+    "bodyFont": "Microsoft YaHei, Noto Sans CJK SC, sans-serif",
+    "texture": 0.38,
+    "handDrawn": 0.78
+  },
+  "groups": [
+    { "id": "input", "title": "输入", "note": "捕捉信号，理解上下文", "color": "#D95F45" },
+    { "id": "orchestration", "title": "编排", "note": "规划路径，验证结果", "color": "#26877F" },
+    { "id": "specialists", "title": "专家能力", "note": "并行、安全、可靠", "color": "#3568B0" },
+    { "id": "delivery", "title": "交付", "note": "以合适的形式抵达", "color": "#D08E2E" }
+  ],
+  "nodes": [
+    { "id": "chat", "group": "input", "title": "对话", "description": "消息、话题、提及", "icon": "chat" },
+    { "id": "schedule", "group": "input", "title": "日程", "description": "事件、期限、空闲时间", "icon": "calendar" },
+    { "id": "voice", "group": "input", "title": "语音", "description": "转写、笔记、命令", "icon": "voice" },
+    { "id": "documents", "group": "input", "title": "文档", "description": "文件、页面、附件", "icon": "document" },
+
+    { "id": "intent", "group": "orchestration", "title": "意图识别", "description": "识别目标、实体与上下文", "icon": "target" },
+    { "id": "planning", "group": "orchestration", "title": "任务规划", "description": "拆解、排序、选择策略", "icon": "plan" },
+    { "id": "routing", "group": "orchestration", "title": "智能路由", "description": "选择专家、分配任务", "icon": "route" },
+    { "id": "verification", "group": "orchestration", "title": "结果验证", "description": "检查结果、执行规则、确保质量", "icon": "shield" },
+
+    { "id": "browser", "group": "specialists", "title": "浏览器", "description": "搜索、浏览、数据采集", "icon": "browser" },
+    { "id": "knowledge", "group": "specialists", "title": "知识库", "description": "检索、文档、内部知识", "icon": "knowledge" },
+    { "id": "code", "group": "specialists", "title": "代码", "description": "生成、分析、运行与测试", "icon": "code" },
+    { "id": "media", "group": "specialists", "title": "媒体", "description": "图片、图表、视频与演示", "icon": "media" },
+
+    { "id": "report", "group": "delivery", "title": "报告", "description": "结构化结果、摘要与引用", "icon": "report" },
+    { "id": "message", "group": "delivery", "title": "消息", "description": "直接回复与通知", "icon": "message" },
+    { "id": "dashboard", "group": "delivery", "title": "看板", "description": "洞察、指标与趋势", "icon": "dashboard" },
+    { "id": "archive", "group": "delivery", "title": "归档", "description": "保存、索引、随时检索", "icon": "archive" }
+  ],
+  "edges": [
+    { "from": "chat", "to": "intent", "kind": "signal" },
+    { "from": "schedule", "to": "planning", "kind": "signal" },
+    { "from": "voice", "to": "routing", "kind": "signal" },
+    { "from": "documents", "to": "verification", "kind": "signal" },
+    { "from": "intent", "to": "browser", "kind": "task" },
+    { "from": "planning", "to": "knowledge", "kind": "task" },
+    { "from": "routing", "to": "code", "kind": "task" },
+    { "from": "verification", "to": "media", "kind": "task" },
+    { "from": "browser", "to": "report", "kind": "result" },
+    { "from": "knowledge", "to": "message", "kind": "result" },
+    { "from": "code", "to": "dashboard", "kind": "result" },
+    { "from": "media", "to": "archive", "kind": "result" },
+    { "from": "verification", "to": "intent", "kind": "feedback", "color": "#8260A6" }
+  ],
+  "notes": [
+    { "text": "中文优先 · 内容驱动布局", "anchor": "top-right", "color": "#D95F45" },
+    { "text": "可编辑 SVG 与 Excalidraw", "anchor": "bottom-right", "color": "#3568B0" }
+  ]
+}

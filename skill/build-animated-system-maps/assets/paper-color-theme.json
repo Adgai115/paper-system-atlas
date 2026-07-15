@@ -1,0 +1,11 @@
+{
+  "name": "paper-color",
+  "paper": "#F5EEDC",
+  "ink": "#17304F",
+  "mutedInk": "#5E665F",
+  "palette": ["#D95F45", "#26877F", "#3568B0", "#D08E2E", "#8260A6"],
+  "titleFont": "STKaiti, KaiTi, serif",
+  "bodyFont": "Microsoft YaHei, Noto Sans CJK SC, sans-serif",
+  "texture": 0.38,
+  "handDrawn": 0.78
+}

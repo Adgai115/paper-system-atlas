@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/paper-system-atlas/atlas-spec.schema.json",
+  "title": "Paper System Atlas Specification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["meta", "groups", "nodes"],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "subtitle": { "type": "string" },
+        "description": { "type": "string" },
+        "language": { "type": "string", "default": "zh-CN" }
+      }
+    },
+    "canvas": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width": { "type": "integer", "minimum": 800, "maximum": 3840, "default": 1600 },
+        "height": { "type": "integer", "minimum": 600, "maximum": 2160, "default": 900 },
+        "fps": { "type": "integer", "minimum": 5, "maximum": 30, "default": 20 },
+        "frames": { "type": "integer", "minimum": 8, "maximum": 120, "default": 40 }
+      }
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "enum": ["layered", "lanes", "radial"], "default": "layered" },
+        "direction": { "enum": ["horizontal", "vertical"], "default": "horizontal" }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "paper": { "$ref": "#/$defs/color" },
+        "ink": { "$ref": "#/$defs/color" },
+        "mutedInk": { "$ref": "#/$defs/color" },
+        "palette": { "type": "array", "minItems": 2, "maxItems": 12, "items": { "$ref": "#/$defs/color" } },
+        "titleFont": { "type": "string" },
+        "bodyFont": { "type": "string" },
+        "texture": { "type": "number", "minimum": 0, "maximum": 1 },
+        "handDrawn": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "title": { "type": "string", "minLength": 1 },
+          "note": { "type": "string" },
+          "color": { "$ref": "#/$defs/color" }
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "group", "title"],
+        "properties": {
+          "id": { "$ref": "#/$defs/id" },
+          "group": { "$ref": "#/$defs/id" },
+          "title": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "icon": { "enum": ["chat", "calendar", "voice", "document", "target", "plan", "route", "shield", "browser", "knowledge", "code", "media", "report", "message", "dashboard", "archive", "memory"] },
+          "color": { "$ref": "#/$defs/color" }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "maxItems": 160,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to"],
+        "properties": {
+          "from": { "$ref": "#/$defs/id" },
+          "to": { "$ref": "#/$defs/id" },
+          "label": { "type": "string" },
+          "color": { "$ref": "#/$defs/color" },
+          "animated": { "type": "boolean", "default": true },
+          "kind": { "enum": ["signal", "task", "result", "feedback"], "default": "signal" }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string", "minLength": 1 },
+          "anchor": { "enum": ["top-left", "top-right", "bottom-left", "bottom-right"] },
+          "color": { "$ref": "#/$defs/color" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_-]+$" },
+    "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+  }
+}

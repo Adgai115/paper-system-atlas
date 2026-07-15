@@ -61,6 +61,7 @@ export interface AtlasSpec {
   layout: {
     mode: LayoutMode;
     direction: "horizontal" | "vertical";
+    profile?: "adaptive" | "atlas-showcase";
   };
   theme: AtlasTheme;
   groups: AtlasGroup[];

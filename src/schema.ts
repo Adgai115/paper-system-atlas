@@ -61,6 +61,7 @@ export const atlasSpecSchema = z.object({
   layout: z.object({
     mode: z.enum(["layered", "lanes", "radial"]).default("layered"),
     direction: z.enum(["horizontal", "vertical"]).default("horizontal"),
+    profile: z.enum(["adaptive", "atlas-showcase"]).default("adaptive"),
   }).default({ mode: "layered", direction: "horizontal" }),
   theme: themeSchema.default({}),
   groups: z.array(groupSchema).min(2).max(8),

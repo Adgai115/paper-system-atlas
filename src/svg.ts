@@ -93,6 +93,22 @@ function smoothPath(edge: LayoutEdge): string {
   return `${result} L ${last[0]} ${last[1]}`;
 }
 
+function organicPath(edge: LayoutEdge): string {
+  const points = edge.path;
+  if (points.length < 3) return smoothPath(edge);
+  let result = `M ${points[0][0]} ${points[0][1]}`;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const p0 = points[Math.max(0, index - 1)];
+    const p1 = points[index];
+    const p2 = points[index + 1];
+    const p3 = points[Math.min(points.length - 1, index + 2)];
+    const c1: [number, number] = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2: [number, number] = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    result += ` C ${c1[0]} ${c1[1]} ${c2[0]} ${c2[1]} ${p2[0]} ${p2[1]}`;
+  }
+  return result;
+}
+
 function pathPoint(edge: LayoutEdge, t: number): [number, number] {
   const lengths = edge.path.slice(1).map((point, index) => Math.hypot(point[0] - edge.path[index][0], point[1] - edge.path[index][1]));
   const total = lengths.reduce((sum, length) => sum + length, 0);
@@ -107,6 +123,27 @@ function pathPoint(edge: LayoutEdge, t: number): [number, number] {
     distance -= lengths[index];
   }
   return edge.path[edge.path.length - 1];
+}
+
+function showcaseDecorations(scene: Scene, hand: number): string {
+  const { spec } = scene;
+  const { width, height } = spec.canvas;
+  const theme = spec.theme;
+  const sx = width / 1674;
+  const sy = height / 941;
+  const callout = (x: number, y: number, lines: string[], color: string, rotation = 0): string => `<g transform="translate(${x * sx} ${y * sy}) rotate(${rotation})">${textLines(lines, 0, 0, 20 * sy, `fill="${color}" font-family="${xml(theme.titleFont)}" font-size="${15 * sy}" font-style="italic"`)}<path d="M0 ${12 * sy} C${38 * sx} ${4 * sy} ${75 * sx} ${17 * sy} ${116 * sx} ${8 * sy}" fill="none" stroke="${color}" stroke-width="1.6" opacity="0.78"/></g>`;
+  const memory = `<g id="showcase-memory"><path d="M${568 * sx} ${768 * sy} C${568 * sx} ${751 * sy} ${732 * sx} ${751 * sy} ${732 * sx} ${768 * sy} V${844 * sy} C${732 * sx} ${865 * sy} ${568 * sx} ${865 * sy} ${568 * sx} ${844 * sy} Z" fill="${theme.paper}" fill-opacity="0.84" stroke="${theme.ink}" stroke-width="1.5"/><ellipse cx="${650 * sx}" cy="${768 * sy}" rx="${82 * sx}" ry="${17 * sy}" fill="${theme.palette[1]}" fill-opacity="0.08" stroke="${theme.ink}" stroke-width="1.5"/><ellipse cx="${650 * sx}" cy="${771 * sy}" rx="${78 * sx}" ry="${13 * sy}" fill="none" stroke="${theme.palette[1]}" stroke-width="1" opacity="0.58"/><path d="M${574 * sx} ${842 * sy} C${604 * sx} ${856 * sy} ${695 * sx} ${858 * sy} ${726 * sx} ${842 * sy}" fill="none" stroke="${theme.palette[1]}" stroke-width="1.2" opacity="0.62"/><text x="${650 * sx}" y="${805 * sy}" text-anchor="middle" fill="${theme.ink}" font-family="${xml(theme.titleFont)}" font-size="${18 * sy}" font-weight="700">记忆与上下文</text><text x="${650 * sx}" y="${829 * sy}" text-anchor="middle" fill="${theme.ink}" opacity="0.82" font-family="${xml(theme.bodyFont)}" font-size="${13 * sy}">历史、偏好、</text><text x="${650 * sx}" y="${848 * sy}" text-anchor="middle" fill="${theme.ink}" opacity="0.82" font-family="${xml(theme.bodyFont)}" font-size="${13 * sy}">知识图谱</text>${[606, 650, 694].map((x) => `<path d="M${x * sx} ${716 * sy} V${755 * sy}" fill="none" stroke="${theme.palette[1]}" stroke-width="1.8" stroke-dasharray="4 5"/><path d="M${(x - 5) * sx} ${747 * sy} L${x * sx} ${756 * sy} L${(x + 5) * sx} ${747 * sy}" fill="none" stroke="${theme.palette[1]}" stroke-width="1.5"/>`).join("")}</g>`;
+  const legendEntries = [
+    [theme.palette[0], "用户信号流", "solid"], [theme.palette[1], "编排流程", "solid"], [theme.palette[2], "专家任务流", "solid"], [theme.palette[4] ?? theme.palette[3], "结果输出流", "solid"], [theme.palette[1], "上下文／反馈", "dotted"], [theme.ink, "端口／接口", "port"], [theme.ink, "存储／记忆", "storage"],
+  ] as const;
+  const legend = `<g id="showcase-legend"><path d="${roughRect({ x: 34 * sx, y: 700 * sy, width: 205 * sx, height: 190 * sy }, "showcase-legend", hand * 0.5, 4)}" fill="${theme.paper}" fill-opacity="0.6" stroke="${theme.ink}" stroke-width="0.9"/><text x="${65 * sx}" y="${730 * sy}" fill="${theme.ink}" font-family="${xml(theme.titleFont)}" font-size="${17 * sy}">图例</text>${legendEntries.map(([color, label, kind], index) => {
+    const y = (752 + index * 20) * sy;
+    const mark = kind === "port" ? `<circle cx="${70 * sx}" cy="${(748 + index * 20) * sy}" r="${6 * sy}" fill="${theme.paper}" stroke="${color}" stroke-width="1.6"/>` : kind === "storage" ? `<ellipse cx="${70 * sx}" cy="${(744 + index * 20) * sy}" rx="${9 * sx}" ry="${4 * sy}" fill="none" stroke="${color}"/><path d="M${61 * sx} ${(744 + index * 20) * sy}v${10 * sy}c0 ${4 * sy} ${18 * sx} ${4 * sy} ${18 * sx} 0v-${10 * sy}" fill="none" stroke="${color}"/>` : `<path d="M${54 * sx} ${y} C${68 * sx} ${(y / sy - 3) * sy} ${82 * sx} ${(y / sy + 3) * sy} ${94 * sx} ${y}" fill="none" stroke="${color}" stroke-width="2.3"${kind === "dotted" ? ` stroke-dasharray="2 5"` : ""}/>`;
+    return `${mark}<text x="${108 * sx}" y="${(757 + index * 20) * sy}" fill="${theme.ink}" font-family="${xml(theme.bodyFont)}" font-size="${12.5 * sy}">${label}</text>`;
+  }).join("")}</g>`;
+  const compass = `<g id="showcase-compass" transform="translate(${1580 * sx} ${801 * sy})" fill="none" stroke="${theme.ink}" opacity="0.68"><circle r="${43 * sy}"/><circle r="${31 * sy}" stroke-width="0.7"/><path d="M0 ${-50 * sy}V${50 * sy}M${-50 * sx} 0H${50 * sx}" stroke-width="0.8"/><path d="M0 ${-39 * sy} L${9 * sx} ${-6 * sy} L0 0 L${-9 * sx} ${-6 * sy} Z M0 ${39 * sy} L${-8 * sx} ${7 * sy} L0 0 L${8 * sx} ${7 * sy} Z M${-39 * sx} 0 L${-7 * sx} ${-8 * sy} L0 0 L${-7 * sx} ${8 * sy} Z M${39 * sx} 0 L${7 * sx} ${8 * sy} L0 0 L${7 * sx} ${-8 * sy} Z" fill="${theme.ink}" fill-opacity="0.2"/><text x="0" y="${-57 * sy}" text-anchor="middle" fill="${theme.ink}" font-family="serif" font-size="${13 * sy}">N</text><text x="0" y="${67 * sy}" text-anchor="middle" fill="${theme.ink}" font-family="serif" font-size="${13 * sy}">S</text><text x="${58 * sx}" y="${5 * sy}" fill="${theme.ink}" font-family="serif" font-size="${13 * sy}">E</text><text x="${-68 * sx}" y="${5 * sy}" fill="${theme.ink}" font-family="serif" font-size="${13 * sy}">W</text></g>`;
+  const landscape = `<g id="showcase-landscape" transform="translate(${1135 * sx} ${805 * sy})" fill="none" stroke="${theme.ink}" opacity="0.34" stroke-linecap="round"><path d="M0 48 C25 36 39 7 58 31 C73 -7 96 28 112 9 C124 31 145 15 163 42 C180 56 196 50 214 59"/><path d="M15 53 C43 44 58 56 85 49 C111 43 128 60 154 50 M61 31 l12 13 l12 -19 l18 22 M106 22 l12 18 l13 -12 l19 24"/><path d="M100 61 C86 72 78 82 91 91 C106 99 118 109 101 121" stroke-width="1.2"/></g>`;
+  return `${memory}${legend}${callout(365, 246, ["捕捉一切，", "理解意图。"], theme.palette[0], -3)}${callout(390, 727, ["规划执行路径，", "路由时带上下文，", "验证结果。"], theme.palette[1], -2)}${callout(898, 765, ["专家各司其职，", "并行、安全、可靠。"], theme.palette[2], -1)}${callout(1244, 690, ["以合适的形式，", "交付给合适的人，", "在正确的时间。"], theme.palette[0], -2)}${callout(1352, 830, ["自适应系统，", "持续学习，", "不断优化结果。"], theme.ink, 1)}${landscape}${compass}`;
 }
 
 export function renderSvg(scene: Scene, options: RenderOptions = {}): string {
@@ -125,16 +162,36 @@ export function renderSvg(scene: Scene, options: RenderOptions = {}): string {
   </defs>`;
 
   const background = `<rect width="${width}" height="${height}" fill="${theme.paper}"/><ellipse cx="${width * 0.18}" cy="${height * 0.27}" rx="${width * 0.3}" ry="${height * 0.35}" fill="url(#paperStainA)"/><ellipse cx="${width * 0.76}" cy="${height * 0.58}" rx="${width * 0.38}" ry="${height * 0.42}" fill="url(#paperStainB)"/><rect width="${width}" height="${height}" filter="url(#paperNoise)" opacity="0.9"/><rect width="${width}" height="${height}" fill="url(#paperFibers)"/><g fill="none" stroke="#806B4B" opacity="0.075"><path d="M38 150 C310 142 615 161 895 149 S1338 146 1563 154"/><path d="M47 ${height - 54} C350 ${height - 61} 694 ${height - 47} 1012 ${height - 57} S1395 ${height - 49} 1550 ${height - 58}"/></g>`;
-  const titleSize = Math.max(52, Math.min(68, width * 0.043));
-  const title = `<g transform="rotate(${jitter(spec.meta.title, 0.32, 6).toFixed(2)} 64 70)"><text x="64" y="76" fill="${theme.ink}" font-family="${xml(theme.titleFont)}" font-size="${titleSize}" font-weight="700" letter-spacing="3">${xml(spec.meta.title)}</text>${spec.meta.subtitle ? `<text x="68" y="119" fill="${theme.ink}" opacity="0.82" font-family="${xml(theme.bodyFont)}" font-size="23" letter-spacing="2">${xml(spec.meta.subtitle)}</text>` : ""}<path d="M64 133 C168 127 286 140 407 131" stroke="${theme.palette[0]}" stroke-width="2.4" fill="none" stroke-linecap="round" opacity="0.72"/><path d="M82 137 C174 132 282 141 367 135" stroke="${theme.ink}" stroke-width="0.75" fill="none" opacity="0.3"/></g>`;
+  const showcaseTitle = spec.layout.profile === "atlas-showcase" && spec.layout.mode === "layered";
+  const titleSize = showcaseTitle ? 72 : Math.max(52, Math.min(68, width * 0.043));
+  const titleX = showcaseTitle ? 80 : 64;
+  const titleY = showcaseTitle ? 108 : 76;
+  const subtitleY = showcaseTitle ? 158 : 119;
+  const title = `<g transform="rotate(${jitter(spec.meta.title, 0.32, 6).toFixed(2)} ${titleX} ${titleY})"><text x="${titleX}" y="${titleY}" fill="${theme.ink}" font-family="${xml(theme.titleFont)}" font-size="${titleSize}" font-weight="700" letter-spacing="3">${xml(spec.meta.title)}</text>${spec.meta.subtitle ? `<text x="${titleX + 4}" y="${subtitleY}" fill="${theme.ink}" opacity="0.82" font-family="${xml(theme.bodyFont)}" font-size="${showcaseTitle ? 24 : 23}" letter-spacing="2">${xml(spec.meta.subtitle)}</text>` : ""}${showcaseTitle ? "" : `<path d="M64 133 C168 127 286 140 407 131" stroke="${theme.palette[0]}" stroke-width="2.4" fill="none" stroke-linecap="round" opacity="0.72"/><path d="M82 137 C174 132 282 141 367 135" stroke="${theme.ink}" stroke-width="0.75" fill="none" opacity="0.3"/>`}</g>`;
 
   const edgeSvg = scene.edges.map((edge, index) => {
-    const path = smoothPath(edge);
+    const showcase = spec.layout.profile === "atlas-showcase" && spec.layout.mode === "layered";
+    const renderPath = showcase ? organicPath : smoothPath;
+    const path = renderPath(edge);
     const start = edge.path[0];
     const end = edge.path[edge.path.length - 1];
     const ports = `<circle cx="${start[0]}" cy="${start[1]}" r="7" fill="${theme.paper}" stroke="${theme.ink}" stroke-width="1.7"/><circle cx="${start[0]}" cy="${start[1]}" r="4.5" fill="none" stroke="${edge.color}" stroke-width="1.4"/><circle cx="${end[0]}" cy="${end[1]}" r="6" fill="${theme.paper}" stroke="${theme.ink}" stroke-width="1.55"/>`;
     const dash = edge.kind === "feedback" ? ` stroke-dasharray="4 6"` : "";
-    const base = `<path id="edge-${index}" d="${path}" fill="none" stroke="${edge.color}" stroke-width="7" stroke-opacity="0.07" stroke-linecap="round"/><path d="${path}" transform="translate(1.3 -1.1)" fill="none" stroke="${edge.color}" stroke-width="1.15" stroke-opacity="0.42" stroke-linecap="round"/><path d="${path}" fill="none" stroke="${edge.color}" stroke-width="2.2" stroke-opacity="0.86" marker-end="url(#arrow)" stroke-linecap="round" stroke-linejoin="round"${dash}/>`;
+    const leftHub: [number, number] = [width * (485 / 1674), height * (459 / 941)];
+    const rightHub: [number, number] = [width * (1315 / 1674), height * (443 / 941)];
+    const hubIndex = showcase ? edge.path.findIndex((point) => (Math.hypot(point[0] - leftHub[0], point[1] - leftHub[1]) < 2) || (Math.hypot(point[0] - rightHub[0], point[1] - rightHub[1]) < 2)) : -1;
+    let base: string;
+    if (hubIndex > 0 && hubIndex < edge.path.length - 1) {
+      const firstPath = renderPath({ ...edge, path: edge.path.slice(0, hubIndex + 1) });
+      const secondPath = renderPath({ ...edge, path: edge.path.slice(hubIndex) });
+      const isLeftHub = Math.abs(edge.path[hubIndex][0] - leftHub[0]) < 2;
+      const deliveryIndex = scene.nodes.filter((node) => scene.groups.find((group) => group.id === node.group)?.index === 3).findIndex((node) => node.id === edge.to);
+      const firstColor = isLeftHub ? theme.palette[0] : edge.color;
+      const secondColor = isLeftHub ? theme.palette[1] : (deliveryIndex < 2 ? theme.palette[0] : theme.palette[3]);
+      base = `<path id="edge-${index}" d="${path}" fill="none" stroke="${edge.color}" stroke-width="7" stroke-opacity="0.07" stroke-linecap="round"/><path d="${firstPath}" transform="translate(1.2 -1)" fill="none" stroke="${firstColor}" stroke-width="1.1" stroke-opacity="0.4"/><path d="${firstPath}" fill="none" stroke="${firstColor}" stroke-width="2.25" stroke-opacity="0.88" stroke-linecap="round" stroke-linejoin="round"/><path d="${secondPath}" transform="translate(1.2 -1)" fill="none" stroke="${secondColor}" stroke-width="1.1" stroke-opacity="0.4"/><path d="${secondPath}" fill="none" stroke="${secondColor}" stroke-width="2.25" stroke-opacity="0.88" marker-end="url(#arrow)" stroke-linecap="round" stroke-linejoin="round"/>`;
+    } else {
+      base = `<path id="edge-${index}" d="${path}" fill="none" stroke="${edge.color}" stroke-width="7" stroke-opacity="0.07" stroke-linecap="round"/><path d="${path}" transform="translate(1.3 -1.1)" fill="none" stroke="${edge.color}" stroke-width="1.15" stroke-opacity="0.42" stroke-linecap="round"/><path d="${path}" fill="none" stroke="${edge.color}" stroke-width="2.2" stroke-opacity="0.86" marker-end="url(#arrow)" stroke-linecap="round" stroke-linejoin="round"${dash}/>`;
+    }
     const accent = `<path d="${path}" fill="none" stroke="${edge.color}" stroke-width="0.9" stroke-dasharray="1 9" stroke-dashoffset="4" stroke-opacity="0.82"/>${ports}`;
     if (!edge.animated) return base + accent;
     if (options.animatedSvg) return `${base}${accent}<circle r="5" fill="${edge.color}"><animateMotion dur="3.2s" begin="${(index % 7) * -0.37}s" repeatCount="indefinite" path="${path}"/></circle>`;
@@ -165,7 +222,8 @@ export function renderSvg(scene: Scene, options: RenderOptions = {}): string {
     const groupTitleSize = Math.max(19, Math.min(27, (b.width - 84) / Math.max(2.5, textUnits(group.title))));
     const noteX = floating ? b.x + 54 : lane ? b.x + Math.min(230, b.width * 0.25) : b.x + 22;
     const noteY = floating ? b.y + 57 : lane ? b.y + 36 : b.y + 62;
-    return `<g id="group-${xml(group.id)}"><path d="${roughRect(wash, `${group.id}-wash-a`, hand * 2.7, 32)}" fill="${group.color}" opacity="0.13" filter="url(#watercolor)"/><path d="${roughRect({ x: wash.x + 8, y: wash.y + 5, width: wash.width - 13, height: wash.height - 9 }, `${group.id}-wash-b`, hand * 3.1, 38)}" fill="${group.color}" opacity="0.055" filter="url(#softWash)"/><path d="${roughRect(outline, group.id, hand * 1.14, 28)}" fill="${group.color}" fill-opacity="0.025" stroke="${group.color}" stroke-width="1.65" stroke-dasharray="8 5"/><path d="${roughRect({ x: outline.x + 4, y: outline.y + 2, width: outline.width - 8, height: outline.height - 5 }, `${group.id}-echo`, hand * 0.86, 30)}" fill="none" stroke="${group.color}" stroke-width="0.75" opacity="0.36"/><circle cx="${b.x + 25}" cy="${b.y + 27}" r="18" fill="${theme.paper}" fill-opacity="0.86" stroke="${group.color}" stroke-width="2"/><circle cx="${b.x + 26.2}" cy="${b.y + 26.2}" r="21" fill="none" stroke="${group.color}" stroke-width="0.7" opacity="0.42"/><text x="${b.x + 25}" y="${b.y + 34}" text-anchor="middle" fill="${group.color}" font-family="${xml(theme.titleFont)}" font-size="22" font-weight="700">${group.index + 1}</text><text x="${b.x + 54}" y="${b.y + 36}" fill="${group.color}" font-family="${xml(theme.titleFont)}" font-size="${groupTitleSize}" font-weight="700" letter-spacing="1.5">${xml(group.title)}</text>${group.note ? `<text x="${noteX}" y="${noteY}" fill="${theme.mutedInk}" font-family="${xml(theme.bodyFont)}" font-size="12.5">${xml(group.note)}</text>` : ""}</g>`;
+    const showGroupNote = group.note && !(spec.layout.profile === "atlas-showcase" && spec.layout.mode === "layered");
+    return `<g id="group-${xml(group.id)}"><path d="${roughRect(wash, `${group.id}-wash-a`, hand * 2.7, 32)}" fill="${group.color}" opacity="0.13" filter="url(#watercolor)"/><path d="${roughRect({ x: wash.x + 8, y: wash.y + 5, width: wash.width - 13, height: wash.height - 9 }, `${group.id}-wash-b`, hand * 3.1, 38)}" fill="${group.color}" opacity="0.055" filter="url(#softWash)"/><path d="${roughRect(outline, group.id, hand * 1.14, 28)}" fill="${group.color}" fill-opacity="0.025" stroke="${group.color}" stroke-width="1.65" stroke-dasharray="8 5"/><path d="${roughRect({ x: outline.x + 4, y: outline.y + 2, width: outline.width - 8, height: outline.height - 5 }, `${group.id}-echo`, hand * 0.86, 30)}" fill="none" stroke="${group.color}" stroke-width="0.75" opacity="0.36"/><circle cx="${b.x + 25}" cy="${b.y + 27}" r="18" fill="${theme.paper}" fill-opacity="0.86" stroke="${group.color}" stroke-width="2"/><circle cx="${b.x + 26.2}" cy="${b.y + 26.2}" r="21" fill="none" stroke="${group.color}" stroke-width="0.7" opacity="0.42"/><text x="${b.x + 25}" y="${b.y + 34}" text-anchor="middle" fill="${group.color}" font-family="${xml(theme.titleFont)}" font-size="22" font-weight="700">${group.index + 1}</text><text x="${b.x + 54}" y="${b.y + 36}" fill="${group.color}" font-family="${xml(theme.titleFont)}" font-size="${groupTitleSize}" font-weight="700" letter-spacing="1.5">${xml(group.title)}</text>${showGroupNote ? `<text x="${noteX}" y="${noteY}" fill="${theme.mutedInk}" font-family="${xml(theme.bodyFont)}" font-size="12.5">${xml(group.note!)}</text>` : ""}</g>`;
   }).join("");
 
   const nodes = scene.nodes.map((node) => {
@@ -195,18 +253,20 @@ export function renderSvg(scene: Scene, options: RenderOptions = {}): string {
     const anchor = note.anchor ?? (index % 2 ? "bottom-right" : "bottom-left");
     const color = note.color ?? theme.mutedInk;
     if (anchor === "top-right") {
-      const box = { x: width - 220, y: 40, width: 170, height: 112 };
-      const principles = (spec.notes ?? []).flatMap((item) => item.text.split(/\s*·\s*/)).map((item) => /SVG|Excalidraw/i.test(item) ? "可编辑矢量输出" : item);
-      const lines = principles.flatMap((item) => wrapText(item, 10, 2)).slice(0, 4);
-      return `<g transform="rotate(${jitter(note.text, 0.8, 4).toFixed(2)} ${box.x + box.width / 2} ${box.y + box.height / 2})"><path d="${roughRect(box, `note-${index}`, hand * 0.65, 3)}" fill="${theme.paper}" fill-opacity="0.68" stroke="${theme.ink}" stroke-width="1" opacity="0.72"/><path d="M${box.x + box.width - 24} ${box.y} l24 24 h-24z" fill="none" stroke="${theme.ink}" stroke-width="0.8" opacity="0.6"/><text x="${box.x + 18}" y="${box.y + 27}" fill="${theme.ink}" font-family="${xml(theme.titleFont)}" font-size="17">设计注记</text>${textLines(lines.map((line) => `· ${line}`), box.x + 18, box.y + 51, 19, `fill="${color}" font-family="${xml(theme.bodyFont)}" font-size="13"`)}</g>`;
+      const showcase = spec.layout.profile === "atlas-showcase" && spec.layout.mode === "layered";
+      const box = showcase ? { x: width - 240, y: 44, width: 190, height: 164 } : { x: width - 220, y: 40, width: 170, height: 112 };
+      const principles = showcase ? ["以意图为先", "上下文丰富", "专家驱动", "可验证与安全", "人性回环中"] : (spec.notes ?? []).flatMap((item) => item.text.split(/\s*·\s*/)).map((item) => /SVG|Excalidraw/i.test(item) ? "可编辑矢量输出" : item);
+      const lines = principles.flatMap((item) => wrapText(item, 10, 2)).slice(0, showcase ? 5 : 4);
+      return `<g transform="rotate(${jitter(note.text, 0.8, 4).toFixed(2)} ${box.x + box.width / 2} ${box.y + box.height / 2})"><path d="${roughRect(box, `note-${index}`, hand * 0.65, 3)}" fill="${theme.paper}" fill-opacity="0.68" stroke="${theme.ink}" stroke-width="1" opacity="0.72"/><path d="M${box.x + box.width - 24} ${box.y} l24 24 h-24z" fill="none" stroke="${theme.ink}" stroke-width="0.8" opacity="0.6"/><text x="${box.x + 18}" y="${box.y + 27}" fill="${theme.ink}" font-family="${xml(theme.titleFont)}" font-size="17">${showcase ? "设计原则" : "设计注记"}</text>${textLines(lines.map((line) => `· ${line}`), box.x + 18, box.y + 51, 19, `fill="${color}" font-family="${xml(theme.bodyFont)}" font-size="13"`)}</g>`;
     }
+    if (spec.layout.profile === "atlas-showcase" && spec.layout.mode === "layered") return "";
     const x = spec.layout.mode === "layered" ? (anchor.endsWith("right") ? width - 330 : 58) : width * 0.42;
     const y = spec.layout.mode === "layered" ? height - 84 - index * 24 : height - 48;
     const lines = wrapText(note.text, 16, 2);
     return `<g transform="rotate(${jitter(note.text, 1.2, 7).toFixed(2)} ${x} ${y})">${textLines(lines, x, y, 19, `fill="${color}" font-family="${xml(theme.titleFont)}" font-size="15.5" font-style="italic"`)}<path d="M${x} ${y + 10} C${x + 42} ${y + 2} ${x + 92} ${y + 17} ${x + 142} ${y + 8}" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.74"/></g>`;
   }).join("");
 
-  const layeredDecorations = spec.layout.mode === "layered" && scene.groups.length === 4 ? `<g id="atlas-legend"><path d="${roughRect({ x: 30, y: height - 142, width: 190, height: 116 }, "legend", hand * 0.54, 4)}" fill="${theme.paper}" fill-opacity="0.52" stroke="${theme.ink}" stroke-width="0.9" opacity="0.82"/><text x="48" y="${height - 116}" fill="${theme.ink}" font-family="${xml(theme.titleFont)}" font-size="16">图例</text>${[
+  const layeredDecorations = spec.layout.profile === "atlas-showcase" && spec.layout.mode === "layered" ? showcaseDecorations(scene, hand) : spec.layout.mode === "layered" && scene.groups.length === 4 ? `<g id="atlas-legend"><path d="${roughRect({ x: 30, y: height - 142, width: 190, height: 116 }, "legend", hand * 0.54, 4)}" fill="${theme.paper}" fill-opacity="0.52" stroke="${theme.ink}" stroke-width="0.9" opacity="0.82"/><text x="48" y="${height - 116}" fill="${theme.ink}" font-family="${xml(theme.titleFont)}" font-size="16">图例</text>${[
     [theme.palette[0], "用户信号流"], [theme.palette[1], "编排与反馈"], [theme.palette[2], "专家任务流"], [theme.palette[4] ?? theme.palette[3], "结果输出流"],
   ].map(([color, label], index) => `<path d="M48 ${height - 94 + index * 18} C65 ${height - 97 + index * 18} 76 ${height - 91 + index * 18} 91 ${height - 94 + index * 18}" stroke="${color}" stroke-width="2.4" fill="none"/><text x="103" y="${height - 89 + index * 18}" fill="${theme.ink}" font-family="${xml(theme.bodyFont)}" font-size="12">${label}</text>`).join("")}</g>${spec.meta.description ? `<g transform="rotate(-1.2 ${width * 0.4} ${height - 58})">${textLines(wrapText(spec.meta.description, 18, 2), width * 0.36, height - 75, 19, `fill="${theme.palette[1]}" font-family="${xml(theme.titleFont)}" font-size="15"`)}<path d="M${width * 0.43} ${height - 99} q18 -24 34 -7" fill="none" stroke="${theme.palette[1]}" stroke-width="1.4"/><path d="M${width * 0.452} ${height - 95} l-7 -10 l12 1" fill="none" stroke="${theme.palette[1]}" stroke-width="1.4"/></g>` : ""}` : "";
 

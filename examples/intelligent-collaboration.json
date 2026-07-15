@@ -7,14 +7,15 @@
     "language": "zh-CN"
   },
   "canvas": {
-    "width": 1600,
-    "height": 900,
+    "width": 1674,
+    "height": 941,
     "fps": 8,
     "frames": 16
   },
   "layout": {
     "mode": "layered",
-    "direction": "horizontal"
+    "direction": "horizontal",
+    "profile": "atlas-showcase"
   },
   "theme": {
     "name": "paper-color",
@@ -59,6 +60,9 @@
     { "from": "schedule", "to": "planning", "kind": "signal" },
     { "from": "voice", "to": "routing", "kind": "signal" },
     { "from": "documents", "to": "verification", "kind": "signal" },
+    { "from": "intent", "to": "planning", "kind": "task", "animated": false, "color": "#2D8585" },
+    { "from": "planning", "to": "routing", "kind": "task", "animated": false, "color": "#2D8585" },
+    { "from": "routing", "to": "verification", "kind": "task", "animated": false, "color": "#2D8585" },
     { "from": "intent", "to": "browser", "kind": "task" },
     { "from": "planning", "to": "knowledge", "kind": "task" },
     { "from": "routing", "to": "code", "kind": "task" },

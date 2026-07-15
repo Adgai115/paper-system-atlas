@@ -100,8 +100,24 @@ test("默认分层主题保留非对称构图、汇聚枢纽和手绘图例", as
   assert.notEqual(scene.groups[0].box.width, scene.groups[2].box.width);
   const svg = renderSvg(scene);
   assert.match(svg, /id="atlas-junctions"/);
-  assert.match(svg, /id="atlas-legend"/);
+  assert.match(svg, /id="showcase-legend"/);
   assert.match(svg, /#CC654B|#cc654b/);
+});
+
+test("展示模板包含参考构图的全部可编辑语义装饰", async () => {
+  const scene = buildScene(await fixture());
+  const svg = renderSvg(scene);
+  for (const id of ["showcase-memory", "showcase-legend", "showcase-compass", "showcase-landscape"]) {
+    assert.match(svg, new RegExp(`id="${id}"`));
+  }
+  assert.match(svg, /设计原则/);
+  assert.match(svg, /记忆与上下文/);
+
+  const excalidraw = JSON.parse(renderExcalidraw(scene));
+  const ids = new Set(excalidraw.elements.map((element: { id: string }) => element.id));
+  for (const id of ["showcase-memory-body", "showcase-principles", "showcase-legend", "showcase-compass", "showcase-landscape"]) {
+    assert.ok(ids.has(id), `Excalidraw 缺少 ${id}`);
+  }
 });
 
 test("SVG 与 Excalidraw 保留中文内容和唯一元素 ID", async () => {

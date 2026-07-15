@@ -9,14 +9,14 @@ function inset(box: Box, left: number, top: number, right = left, bottom = top):
 }
 
 function layeredGroups(spec: AtlasSpec): LayoutGroup[] {
-  if (spec.groups.length === 4 && spec.canvas.width >= 1200 && spec.canvas.height >= 760) {
-    const scaleX = spec.canvas.width / 1600;
-    const scaleY = spec.canvas.height / 900;
+  if (spec.layout.profile === "atlas-showcase" && spec.groups.length === 4 && spec.canvas.width >= 1200 && spec.canvas.height >= 760) {
+    const scaleX = spec.canvas.width / 1674;
+    const scaleY = spec.canvas.height / 941;
     const blueprint = [
-      { x: 68, y: 260, width: 258, height: 480 },
-      { x: 458, y: 166, width: 304, height: 574 },
-      { x: 844, y: 142, width: 346, height: 598 },
-      { x: 1290, y: 255, width: 242, height: 485 },
+      { x: 80, y: 260, width: 245, height: 430 },
+      { x: 500, y: 154, width: 300, height: 560 },
+      { x: 895, y: 112, width: 310, height: 610 },
+      { x: 1340, y: 232, width: 270, height: 470 },
     ];
     return spec.groups.map((group, index) => ({
       ...group,
@@ -106,7 +106,24 @@ function radialGroups(spec: AtlasSpec): LayoutGroup[] {
   return result;
 }
 
-function layoutNodesInGroup(group: LayoutGroup, nodes: AtlasNode[], laneMode: boolean, radialMode: boolean): LayoutNode[] {
+function layoutNodesInGroup(group: LayoutGroup, nodes: AtlasNode[], laneMode: boolean, radialMode: boolean, showcaseMode: boolean): LayoutNode[] {
+  if (showcaseMode && nodes.length <= 4) {
+    const presets = [
+      { left: 18, top: 62, width: 215, height: 72, step: 88 },
+      { left: 40, top: 82, width: 210, height: 90, step: 112 },
+      { left: 30, top: 70, width: 230, height: 95, step: 135 },
+      { left: 30, top: 60, width: 220, height: 72, step: 100 },
+    ][group.index];
+    return nodes.map((node, index) => ({
+      ...node,
+      box: {
+        x: group.box.x + presets.left,
+        y: group.box.y + presets.top + index * presets.step,
+        width: presets.width,
+        height: presets.height,
+      },
+    }));
+  }
   const inner = inset(group.box, 18, laneMode ? 54 : 76, 18, laneMode ? 14 : 22);
   if (radialMode) {
     const columns = nodes.length <= 2 ? 1 : 2;
@@ -306,6 +323,9 @@ function connectionPath(from: Box, to: Box, key: string, obstacles: Box[], previ
 }
 
 function atlasFlowPath(from: Box, to: Box, fromGroup: LayoutGroup, toGroup: LayoutGroup, key: string, canvas: Box): Point[] | undefined {
+  if (fromGroup.index === 1 && toGroup.index === 1 && to.y > from.y) {
+    return [anchor(from, "bottom"), anchor(to, "top")];
+  }
   if (toGroup.index !== fromGroup.index + 1) return undefined;
   const start = anchor(from, "right");
   const end = anchor(to, "left");
@@ -313,7 +333,9 @@ function atlasFlowPath(from: Box, to: Box, fromGroup: LayoutGroup, toGroup: Layo
   if (gap < 34) return undefined;
   const wave = seedWave(key, 13);
   if (fromGroup.index === 0 || fromGroup.index === 2) {
-    const hub: Point = [fromGroup.box.x + fromGroup.box.width + gap / 2, canvas.height * (fromGroup.index === 0 ? 0.51 : 0.49)];
+    const hub: Point = fromGroup.index === 0
+      ? [canvas.width * (485 / 1674), canvas.height * (459 / 941)]
+      : [canvas.width * (1315 / 1674), canvas.height * (443 / 941)];
     return compactPath([
       start,
       [start[0] + 20, start[1]],
@@ -337,8 +359,9 @@ function atlasFlowPath(from: Box, to: Box, fromGroup: LayoutGroup, toGroup: Layo
 export function buildScene(spec: AtlasSpec): Scene {
   const laneMode = spec.layout.mode === "lanes" || spec.layout.direction === "vertical";
   const radialMode = spec.layout.mode === "radial";
+  const showcaseMode = spec.layout.profile === "atlas-showcase" && spec.layout.mode === "layered";
   const groups = radialMode ? radialGroups(spec) : laneMode ? laneGroups(spec) : layeredGroups(spec);
-  const nodes = groups.flatMap((group) => layoutNodesInGroup(group, spec.nodes.filter((node) => node.group === group.id), laneMode, radialMode));
+  const nodes = groups.flatMap((group) => layoutNodesInGroup(group, spec.nodes.filter((node) => node.group === group.id), laneMode, radialMode, showcaseMode));
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   const groupMap = new Map(groups.map((group) => [group.id, group]));
   const routed: Point[][] = [];
@@ -359,7 +382,7 @@ export function buildScene(spec: AtlasSpec): Scene {
       { x: 42, y: 20, width: Math.min(520, spec.canvas.width * 0.5), height: 116 },
     ];
     const canvas = { x: 0, y: 0, width: spec.canvas.width, height: spec.canvas.height };
-    const authoredFlow = spec.layout.mode === "layered" && spec.groups.length === 4 && edge.kind !== "feedback"
+    const authoredFlow = showcaseMode && edge.kind !== "feedback"
       ? atlasFlowPath(from.box, to.box, fromGroup, toGroup, `${edge.from}-${edge.to}`, canvas)
       : undefined;
     const path = authoredFlow ?? connectionPath(from.box, to.box, `${edge.from}-${edge.to}`, obstacles, routed, canvas, edge.kind === "feedback");

@@ -32,7 +32,8 @@
       "additionalProperties": false,
       "properties": {
         "mode": { "enum": ["layered", "lanes", "radial"], "default": "layered" },
-        "direction": { "enum": ["horizontal", "vertical"], "default": "horizontal" }
+        "direction": { "enum": ["horizontal", "vertical"], "default": "horizontal" },
+        "profile": { "enum": ["adaptive", "atlas-showcase"], "default": "adaptive" }
       }
     },
     "theme": {

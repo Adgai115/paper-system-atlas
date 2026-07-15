@@ -42,6 +42,15 @@ node dist/src/cli.js render `
 - 连线会在节点外寻找低冲突走廊，并以圆润手绘折线避开非端点节点。
 - Windows、中文路径与无 FFmpeg 环境是一等使用场景。
 
+## 视觉配置
+
+`layout.profile` 支持两种工作方式：
+
+- `adaptive`：默认自适应排版，适合任意分组、节点数量和三种布局。
+- `atlas-showcase`：四阶段分层图的高保真展示模板，固定采用 1674×941 参考构图，并补全双汇聚点、内部编排链、记忆与上下文、图例、批注、设计原则、罗盘和山景。所有内容仍为可编辑 SVG/Excalidraw 元素，不嵌入参考位图。
+
+示例 `examples/intelligent-collaboration.json` 已启用 `atlas-showcase`；通过 CLI 使用 `--layout lanes` 或 `--layout radial` 时会自动回到 `adaptive`，以保持自动布局能力。
+
 ## 当前状态
 
 当前为原创 MVP 开发版本，许可证与最终公开项目名称尚未确定。

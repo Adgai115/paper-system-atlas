@@ -41,6 +41,7 @@ async function renderCommand(args: Args): Promise<void> {
     if (!(["layered", "lanes", "radial"] as string[]).includes(args.layout)) throw new Error(`不支持的布局: ${args.layout}`);
     spec.layout.mode = args.layout as "layered" | "lanes" | "radial";
     spec.layout.direction = args.layout === "lanes" ? "vertical" : "horizontal";
+    if (args.layout !== "layered") spec.layout.profile = "adaptive";
   }
   const formats = String(args.formats ?? "svg,png,excalidraw").split(",").map((item) => item.trim()).filter(Boolean) as OutputFormat[];
   const supported = new Set<OutputFormat>(["svg", "png", "jpg", "gif", "excalidraw"]);

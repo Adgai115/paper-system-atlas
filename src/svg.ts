@@ -260,9 +260,9 @@ export function renderSvg(scene: Scene, options: RenderOptions = {}): string {
       return `<g transform="rotate(${jitter(note.text, 0.8, 4).toFixed(2)} ${box.x + box.width / 2} ${box.y + box.height / 2})"><path d="${roughRect(box, `note-${index}`, hand * 0.65, 3)}" fill="${theme.paper}" fill-opacity="0.68" stroke="${theme.ink}" stroke-width="1" opacity="0.72"/><path d="M${box.x + box.width - 24} ${box.y} l24 24 h-24z" fill="none" stroke="${theme.ink}" stroke-width="0.8" opacity="0.6"/><text x="${box.x + 18}" y="${box.y + 27}" fill="${theme.ink}" font-family="${xml(theme.titleFont)}" font-size="17">${showcase ? "设计原则" : "设计注记"}</text>${textLines(lines.map((line) => `· ${line}`), box.x + 18, box.y + 51, 19, `fill="${color}" font-family="${xml(theme.bodyFont)}" font-size="13"`)}</g>`;
     }
     if (spec.layout.profile === "atlas-showcase" && spec.layout.mode === "layered") return "";
-    const x = spec.layout.mode === "layered" ? (anchor.endsWith("right") ? width - 330 : 58) : width * 0.42;
-    const y = spec.layout.mode === "layered" ? height - 84 - index * 24 : height - 48;
     const lines = wrapText(note.text, 16, 2);
+    const x = spec.layout.mode === "layered" ? (anchor.endsWith("right") ? width - 330 : 58) : width * 0.42;
+    const y = spec.layout.mode === "layered" ? height - 84 - index * 24 : height - (lines.length > 1 ? 68 : 48);
     return `<g transform="rotate(${jitter(note.text, 1.2, 7).toFixed(2)} ${x} ${y})">${textLines(lines, x, y, 19, `fill="${color}" font-family="${xml(theme.titleFont)}" font-size="15.5" font-style="italic"`)}<path d="M${x} ${y + 10} C${x + 42} ${y + 2} ${x + 92} ${y + 17} ${x + 142} ${y + 8}" fill="none" stroke="${color}" stroke-width="1.5" opacity="0.74"/></g>`;
   }).join("");
 

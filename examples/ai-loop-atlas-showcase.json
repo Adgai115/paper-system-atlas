@@ -1,0 +1,71 @@
+{
+  "$schema": "../schema/atlas-spec.schema.json",
+  "meta": {
+    "title": "AI 循环图谱",
+    "subtitle": "Agent Loop · 持续反馈与自我优化",
+    "description": "从目标触发到评估、调整和持续优化的 AI 智能体闭环",
+    "language": "zh-CN"
+  },
+  "canvas": { "width": 1674, "height": 941, "fps": 8, "frames": 16 },
+  "layout": { "mode": "layered", "direction": "horizontal", "profile": "atlas-showcase" },
+  "theme": {
+    "name": "paper-color",
+    "paper": "#F6EEDD",
+    "ink": "#243B56",
+    "mutedInk": "#5F625E",
+    "palette": ["#CC654B", "#2D8585", "#3569A7", "#C18A37", "#7567A2"],
+    "titleFont": "STKaiti, KaiTi, serif",
+    "bodyFont": "STKaiti, KaiTi, Microsoft YaHei, Noto Sans CJK SC, serif",
+    "texture": 0.52,
+    "handDrawn": 0.9
+  },
+  "groups": [
+    { "id": "trigger", "title": "目标触发", "note": "明确目标、事件与边界", "color": "#CC654B" },
+    { "id": "agent-loop", "title": "核心循环", "note": "推理、计划、行动、观察", "color": "#2D8585" },
+    { "id": "loop-types", "title": "闭环增强", "note": "学习、记忆、自动化与人工", "color": "#3569A7" },
+    { "id": "outcome", "title": "持续优化", "note": "安全交付并逼近目标", "color": "#C18A37" }
+  ],
+  "nodes": [
+    { "id": "goal", "group": "trigger", "title": "用户目标", "description": "定义期望结果与完成标准", "icon": "target" },
+    { "id": "event", "group": "trigger", "title": "事件触发", "description": "对话、任务、业务事件", "icon": "chat" },
+    { "id": "context", "group": "trigger", "title": "任务上下文", "description": "数据、文档、历史状态", "icon": "document" },
+    { "id": "boundary", "group": "trigger", "title": "风险边界", "description": "权限、金额与安全规则", "icon": "shield" },
+
+    { "id": "reason", "group": "agent-loop", "title": "理解推理", "description": "识别任务、约束与缺失信息", "icon": "target" },
+    { "id": "plan", "group": "agent-loop", "title": "制定计划", "description": "拆解步骤、选择下一动作", "icon": "plan" },
+    { "id": "act", "group": "agent-loop", "title": "调用工具", "description": "执行搜索、接口与代码", "icon": "route" },
+    { "id": "evaluate", "group": "agent-loop", "title": "观察评估", "description": "检查结果、错误与完成度", "icon": "shield" },
+
+    { "id": "self-improve", "group": "loop-types", "title": "自我改进", "description": "生成、评价、修正、再生成", "icon": "code" },
+    { "id": "memory-loop", "group": "loop-types", "title": "记忆循环", "description": "提取记忆并调整未来行为", "icon": "memory" },
+    { "id": "automation-loop", "group": "loop-types", "title": "自动化循环", "description": "事件、决策、动作、反馈", "icon": "route" },
+    { "id": "human-loop", "group": "loop-types", "title": "人在回路", "description": "高风险动作等待人工确认", "icon": "message" },
+
+    { "id": "adjust", "group": "outcome", "title": "策略调整", "description": "依据反馈改变下一步", "icon": "plan" },
+    { "id": "deliver", "group": "outcome", "title": "结果交付", "description": "报告、回复或系统动作", "icon": "report" },
+    { "id": "track", "group": "outcome", "title": "状态跟踪", "description": "持续观察任务与业务状态", "icon": "dashboard" },
+    { "id": "optimize", "group": "outcome", "title": "持续优化", "description": "更稳定、高效且安全", "icon": "archive" }
+  ],
+  "edges": [
+    { "from": "goal", "to": "reason", "kind": "signal" },
+    { "from": "event", "to": "plan", "kind": "signal" },
+    { "from": "context", "to": "act", "kind": "signal" },
+    { "from": "boundary", "to": "evaluate", "kind": "signal" },
+    { "from": "reason", "to": "plan", "kind": "task", "animated": false, "color": "#2D8585" },
+    { "from": "plan", "to": "act", "kind": "task", "animated": false, "color": "#2D8585" },
+    { "from": "act", "to": "evaluate", "kind": "task", "animated": false, "color": "#2D8585" },
+    { "from": "reason", "to": "self-improve", "kind": "task" },
+    { "from": "plan", "to": "memory-loop", "kind": "task" },
+    { "from": "act", "to": "automation-loop", "kind": "task" },
+    { "from": "evaluate", "to": "human-loop", "kind": "task" },
+    { "from": "self-improve", "to": "adjust", "kind": "result" },
+    { "from": "memory-loop", "to": "deliver", "kind": "result" },
+    { "from": "automation-loop", "to": "track", "kind": "result" },
+    { "from": "human-loop", "to": "optimize", "kind": "result" },
+    { "from": "evaluate", "to": "reason", "kind": "feedback", "color": "#7567A2" }
+  ],
+  "notes": [
+    { "text": "目标驱动 · 反馈闭环 · 持续学习", "anchor": "top-right", "color": "#CC654B" },
+    { "text": "Reason → Act → Observe → Evaluate", "anchor": "bottom-right", "color": "#3569A7" }
+  ]
+}

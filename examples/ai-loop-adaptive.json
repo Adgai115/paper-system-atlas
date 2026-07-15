@@ -1,0 +1,64 @@
+{
+  "$schema": "../schema/atlas-spec.schema.json",
+  "meta": {
+    "title": "AI Loop",
+    "subtitle": "智能体持续反馈闭环 · 自适应径向架构",
+    "description": "目标、推理、行动、观察、记忆与安全交付构成的动态 Agent Loop",
+    "language": "zh-CN"
+  },
+  "canvas": { "width": 1600, "height": 1000, "fps": 8, "frames": 16 },
+  "layout": { "mode": "radial", "direction": "horizontal", "profile": "adaptive" },
+  "theme": {
+    "name": "paper-color",
+    "paper": "#F6EEDD",
+    "ink": "#243B56",
+    "mutedInk": "#5F625E",
+    "palette": ["#CC654B", "#2D8585", "#3569A7", "#C18A37", "#7567A2"],
+    "titleFont": "STKaiti, KaiTi, serif",
+    "bodyFont": "STKaiti, KaiTi, Microsoft YaHei, Noto Sans CJK SC, serif",
+    "texture": 0.52,
+    "handDrawn": 0.9
+  },
+  "groups": [
+    { "id": "goal-input", "title": "目标输入", "note": "目标与业务事件", "color": "#CC654B" },
+    { "id": "reason-plan", "title": "推理规划", "note": "理解并选择下一步", "color": "#2D8585" },
+    { "id": "action", "title": "行动执行", "note": "调用工具改变环境", "color": "#3569A7" },
+    { "id": "observe", "title": "观察评估", "note": "读取结果判断完成度", "color": "#7567A2" },
+    { "id": "memory", "title": "记忆学习", "note": "保存经验、自我修正", "color": "#2D8585" },
+    { "id": "governance", "title": "安全交付", "note": "人工确认与最终结果", "color": "#C18A37" }
+  ],
+  "nodes": [
+    { "id": "user-goal", "group": "goal-input", "title": "用户目标", "description": "期望结果与完成标准", "icon": "target" },
+    { "id": "business-event", "group": "goal-input", "title": "事件触发", "description": "对话、审批、业务变化", "icon": "chat" },
+    { "id": "reasoning", "group": "reason-plan", "title": "理解任务", "description": "识别约束和缺失信息", "icon": "target" },
+    { "id": "planning", "group": "reason-plan", "title": "制定计划", "description": "拆解步骤和选择策略", "icon": "plan" },
+    { "id": "tool-call", "group": "action", "title": "调用工具", "description": "搜索、API、代码与系统", "icon": "route" },
+    { "id": "environment", "group": "action", "title": "执行动作", "description": "获取数据或改变状态", "icon": "code" },
+    { "id": "result", "group": "observe", "title": "观察结果", "description": "读取输出、日志与错误", "icon": "dashboard" },
+    { "id": "evaluation", "group": "observe", "title": "完成判断", "description": "评价质量、风险和进度", "icon": "shield" },
+    { "id": "memory-update", "group": "memory", "title": "记忆更新", "description": "保存偏好、历史与经验", "icon": "memory" },
+    { "id": "self-correct", "group": "memory", "title": "自我修正", "description": "调整策略并重新执行", "icon": "route" },
+    { "id": "human-approval", "group": "governance", "title": "人工确认", "description": "高风险动作进入人在回路", "icon": "message" },
+    { "id": "final-delivery", "group": "governance", "title": "结果交付", "description": "报告、回复或自动化动作", "icon": "report" }
+  ],
+  "edges": [
+    { "from": "user-goal", "to": "reasoning", "kind": "signal" },
+    { "from": "business-event", "to": "reasoning", "kind": "signal" },
+    { "from": "reasoning", "to": "planning", "kind": "task" },
+    { "from": "planning", "to": "tool-call", "kind": "task" },
+    { "from": "tool-call", "to": "environment", "kind": "task" },
+    { "from": "environment", "to": "result", "kind": "result" },
+    { "from": "result", "to": "evaluation", "kind": "result" },
+    { "from": "evaluation", "to": "memory-update", "kind": "feedback" },
+    { "from": "memory-update", "to": "self-correct", "kind": "feedback" },
+    { "from": "self-correct", "to": "planning", "kind": "feedback", "color": "#2D8585" },
+    { "from": "evaluation", "to": "human-approval", "kind": "task" },
+    { "from": "evaluation", "to": "final-delivery", "kind": "result" },
+    { "from": "human-approval", "to": "final-delivery", "kind": "result" },
+    { "from": "final-delivery", "to": "user-goal", "kind": "feedback", "color": "#7567A2" }
+  ],
+  "notes": [
+    { "text": "Reason → Plan → Act → Observe → Evaluate", "anchor": "top-right", "color": "#3569A7" },
+    { "text": "记忆与人工确认保障安全", "anchor": "bottom-right", "color": "#C18A37" }
+  ]
+}

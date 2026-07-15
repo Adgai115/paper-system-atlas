@@ -51,6 +51,11 @@ node dist/src/cli.js render `
 
 示例 `examples/intelligent-collaboration.json` 已启用 `atlas-showcase`；通过 CLI 使用 `--layout lanes` 或 `--layout radial` 时会自动回到 `adaptive`，以保持自动布局能力。
 
+AI Loop 测试示例同时展示两种配置：
+
+- `examples/ai-loop-atlas-showcase.json`：四阶段高保真展示图。
+- `examples/ai-loop-adaptive.json`：六阶段径向反馈闭环。
+
 ## 当前状态
 
 当前为原创 MVP 开发版本，许可证与最终公开项目名称尚未确定。

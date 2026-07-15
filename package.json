@@ -7,13 +7,22 @@
   "bin": {
     "paper-atlas": "dist/src/cli.js"
   },
+  "files": [
+    "dist/src/*.js",
+    "schema/*.json",
+    "examples/*.json",
+    "examples/*.md",
+    "skill/build-animated-system-maps/**/*"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/cli.ts",
     "render:example": "tsx src/cli.ts render --spec examples/intelligent-collaboration.json --outdir outputs --basename intelligent-collaboration --formats svg,png,jpg,gif,excalidraw --verify",
     "render:visuals": "powershell -ExecutionPolicy Bypass -File scripts/render-visual-samples.ps1",
     "test": "node --import tsx --test tests/*.test.ts",
-    "check": "npm run build && npm test"
+    "check": "npm run build && npm test",
+    "pack:check": "npm run check && npm pack --dry-run",
+    "package:windows": "powershell -ExecutionPolicy Bypass -File scripts/build-distribution.ps1"
   },
   "dependencies": {
     "gifenc": "^1.0.3",

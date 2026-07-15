@@ -102,4 +102,5 @@ export interface Scene {
 export interface RenderOptions {
   animatedSvg?: boolean;
   frameProgress?: number;
+  rasterOptimized?: boolean;
 }

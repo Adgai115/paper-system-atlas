@@ -11,6 +11,16 @@
 ./scripts/render-example.ps1
 ```
 
+如果只需要部署工具，不需要源码和测试，可生成紧凑安装包：
+
+```powershell
+npm run package:windows
+npm install -g ./dist-package/paper-system-atlas-0.1.0.tgz
+paper-atlas doctor
+```
+
+命令同时生成 `build-animated-system-maps-skill.zip`。把它解压到 Codex skills 目录后，Skill 会优先使用源码仓库 CLI；脱离源码仓库时自动调用全局 `paper-atlas`。仓库保持私有且许可证仍为 `UNLICENSED`，安装包只用于授权环境内部部署。
+
 生成分层、泳道和径向三种中文视觉回归样例：
 
 ```powershell
@@ -66,6 +76,15 @@ $env:PAPER_ATLAS_MODEL = '<模型名称>'
 - 默认四阶段分层图采用窄—宽—宽—窄的非对称构图，并通过左右汇聚枢纽形成自然线束。
 - 连线会在节点外寻找低冲突走廊，并以圆润手绘折线避开非端点节点。
 - Windows、中文路径与无 FFmpeg 环境是一等使用场景。
+- GIF 使用一次静态栅格化、共享调色板和轻量动态叠加；动态层包含信号拖尾、柔和光晕和目标节点响应，不重复执行每帧 SVG 水彩滤镜。
+
+## 动画与性能
+
+- SVG 动画保留可编辑路径，并用多级拖尾表达信号方向。
+- GIF 缓存纸张、文字、节点和连线底图，只重绘移动信号与脉冲反馈。
+- PNG、JPG 与 GIF 共用一次静态栅格化结果，避免同一幅水彩场景重复计算。
+- 所有帧共用同一调色板，降低重复计算并避免逐帧色彩漂移。
+- 分辨率、帧数和帧率仍由语义规格控制，性能优化不会自动降低输出质量。
 
 ## 视觉配置
 

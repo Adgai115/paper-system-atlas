@@ -5,6 +5,7 @@ import gifenc from "gifenc";
 import type { AtlasSpec, Scene } from "./types.js";
 import { renderSvg } from "./svg.js";
 import { renderExcalidraw } from "./excalidraw.js";
+import { paintMotionFrame } from "./motion.js";
 
 export type OutputFormat = "svg" | "png" | "jpg" | "gif" | "excalidraw";
 
@@ -22,16 +23,36 @@ export interface ExportResult {
   fps?: number;
 }
 
-async function exportGif(scene: Scene, target: string): Promise<void> {
+interface StaticRaster {
+  data: Buffer;
+  width: number;
+  height: number;
+  channels: 4;
+}
+
+async function rasterizeStaticScene(scene: Scene, svg: string): Promise<StaticRaster> {
+  const raster = await sharp(Buffer.from(svg)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height } = scene.spec.canvas;
+  if (raster.info.width !== width || raster.info.height !== height || raster.info.channels !== 4) {
+    throw new Error(`静态底图尺寸异常：${raster.info.width}×${raster.info.height}×${raster.info.channels}`);
+  }
+  return { data: raster.data, width, height, channels: 4 };
+}
+
+function sharpFromRaster(raster: StaticRaster): sharp.Sharp {
+  return sharp(raster.data, { raw: { width: raster.width, height: raster.height, channels: raster.channels } });
+}
+
+async function exportGif(scene: Scene, target: string, base: StaticRaster): Promise<void> {
   const { GIFEncoder, applyPalette, quantize } = gifenc;
   const { width, height, frames, fps } = scene.spec.canvas;
   const encoder = GIFEncoder();
+  const representative = paintMotionFrame(scene, base.data, 0.37);
+  const palette = quantize(representative, 256, { format: "rgba4444" });
   for (let index = 0; index < frames; index += 1) {
-    const svg = renderSvg(scene, { frameProgress: index / frames });
-    const pixels = await sharp(Buffer.from(svg)).ensureAlpha().raw().toBuffer();
-    const palette = quantize(pixels, 256, { format: "rgba4444" });
+    const pixels = paintMotionFrame(scene, base.data, index / frames);
     const indexed = applyPalette(pixels, palette, "rgba4444");
-    encoder.writeFrame(indexed, width, height, { palette, delay: Math.round(1000 / fps), repeat: index === 0 ? 0 : undefined });
+    encoder.writeFrame(indexed, width, height, { palette: index === 0 ? palette : undefined, delay: Math.round(1000 / fps), repeat: index === 0 ? 0 : undefined });
   }
   encoder.finish();
   await writeFile(target, encoder.bytes());
@@ -41,7 +62,9 @@ export async function exportScene(scene: Scene, request: ExportRequest): Promise
   await mkdir(request.outdir, { recursive: true });
   const files: ExportResult["files"] = {};
   const file = (format: OutputFormat, extension = format) => path.resolve(request.outdir, `${request.basename}.${extension}`);
-  const staticSvg = renderSvg(scene);
+  const staticSvg = renderSvg(scene, { rasterOptimized: true });
+  const needsRaster = request.formats.some((format) => format === "png" || format === "jpg" || format === "gif");
+  const raster = needsRaster ? await rasterizeStaticScene(scene, staticSvg) : undefined;
   for (const format of request.formats) {
     if (format === "svg") {
       const target = file(format);
@@ -49,15 +72,15 @@ export async function exportScene(scene: Scene, request: ExportRequest): Promise
       files.svg = target;
     } else if (format === "png") {
       const target = file(format);
-      await sharp(Buffer.from(staticSvg)).png({ compressionLevel: 9 }).toFile(target);
+      await sharpFromRaster(raster!).png({ compressionLevel: 9 }).toFile(target);
       files.png = target;
     } else if (format === "jpg") {
       const target = file(format);
-      await sharp(Buffer.from(staticSvg)).jpeg({ quality: 92, chromaSubsampling: "4:4:4" }).toFile(target);
+      await sharpFromRaster(raster!).jpeg({ quality: 92, chromaSubsampling: "4:4:4" }).toFile(target);
       files.jpg = target;
     } else if (format === "gif") {
       const target = file(format);
-      await exportGif(scene, target);
+      await exportGif(scene, target, raster!);
       files.gif = target;
     } else if (format === "excalidraw") {
       const target = file(format);

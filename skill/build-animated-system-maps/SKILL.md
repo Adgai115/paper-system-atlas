@@ -56,6 +56,15 @@ For an existing semantic specification:
 
 The wrapper uses the repository CLI when present and falls back to a globally installed `paper-atlas` command.
 
+For a compact deployment without the source repository, install the generated runtime archive globally, then unpack `build-animated-system-maps-skill.zip` into the Codex skills directory:
+
+```powershell
+npm install -g <paper-system-atlas.tgz>
+paper-atlas doctor
+```
+
+The GIF exporter caches the static paper scene and paints only moving signal trails, halos, and node responses on each frame. Do not replace this optimized path with per-frame full SVG rasterization unless a requested effect cannot be represented by the motion overlay.
+
 ## Quality Gate
 
 - Confirm SVG contains editable text and vector paths.

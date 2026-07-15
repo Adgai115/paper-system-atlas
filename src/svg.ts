@@ -1,4 +1,5 @@
 import type { AtlasNode, Box, LayoutEdge, Scene, RenderOptions } from "./types.js";
+import { pointAlongPath } from "./motion.js";
 
 const xml = (value: unknown): string => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char]!);
 
@@ -109,22 +110,6 @@ function organicPath(edge: LayoutEdge): string {
   return result;
 }
 
-function pathPoint(edge: LayoutEdge, t: number): [number, number] {
-  const lengths = edge.path.slice(1).map((point, index) => Math.hypot(point[0] - edge.path[index][0], point[1] - edge.path[index][1]));
-  const total = lengths.reduce((sum, length) => sum + length, 0);
-  let distance = Math.max(0, Math.min(1, t)) * total;
-  for (let index = 0; index < lengths.length; index += 1) {
-    if (distance <= lengths[index] || index === lengths.length - 1) {
-      const ratio = lengths[index] ? distance / lengths[index] : 0;
-      const from = edge.path[index];
-      const to = edge.path[index + 1];
-      return [from[0] + (to[0] - from[0]) * ratio, from[1] + (to[1] - from[1]) * ratio];
-    }
-    distance -= lengths[index];
-  }
-  return edge.path[edge.path.length - 1];
-}
-
 function showcaseDecorations(scene: Scene, hand: number): string {
   const { spec } = scene;
   const { width, height } = spec.canvas;
@@ -151,9 +136,15 @@ export function renderSvg(scene: Scene, options: RenderOptions = {}): string {
   const { width, height } = spec.canvas;
   const theme = spec.theme;
   const hand = Math.max(0.2, theme.handDrawn) * 3.5;
+  const paperNoiseFilter = options.rasterOptimized
+    ? `<filter id="paperNoise" x="-4%" y="-4%" width="108%" height="108%"><feTurbulence type="fractalNoise" baseFrequency="0.026 0.16" numOctaves="1" seed="13" result="grain"/><feColorMatrix in="grain" values="0 0 0 0 0.43 0 0 0 0 0.34 0 0 0 0 0.22 0 0 0 ${0.08 * theme.texture} 0"/></filter>`
+    : `<filter id="paperNoise" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.018 0.18" numOctaves="3" seed="13" result="grain"/><feColorMatrix in="grain" values="0 0 0 0 0.43 0 0 0 0 0.34 0 0 0 0 0.22 0 0 0 ${0.11 * theme.texture} 0"/></filter>`;
+  const watercolorFilter = options.rasterOptimized
+    ? `<filter id="watercolor" x="-18%" y="-18%" width="136%" height="136%"><feGaussianBlur stdDeviation="4.8"/></filter>`
+    : `<filter id="watercolor" x="-25%" y="-25%" width="150%" height="150%"><feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="29" result="washNoise"/><feDisplacementMap in="SourceGraphic" in2="washNoise" scale="13" xChannelSelector="R" yChannelSelector="B" result="warped"/><feGaussianBlur in="warped" stdDeviation="5.5"/></filter>`;
   const defs = `<defs>
-    <filter id="paperNoise" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.018 0.18" numOctaves="3" seed="13" result="grain"/><feColorMatrix in="grain" values="0 0 0 0 0.43 0 0 0 0 0.34 0 0 0 0 0.22 0 0 0 ${0.11 * theme.texture} 0"/></filter>
-    <filter id="watercolor" x="-25%" y="-25%" width="150%" height="150%"><feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="29" result="washNoise"/><feDisplacementMap in="SourceGraphic" in2="washNoise" scale="13" xChannelSelector="R" yChannelSelector="B" result="warped"/><feGaussianBlur in="warped" stdDeviation="5.5"/></filter>
+    ${paperNoiseFilter}
+    ${watercolorFilter}
     <filter id="softWash" x="-18%" y="-28%" width="136%" height="156%"><feGaussianBlur stdDeviation="4.5"/></filter>
     <pattern id="paperFibers" width="180" height="96" patternUnits="userSpaceOnUse"><path d="M-12 18 C38 11 95 25 192 16 M-20 62 C54 71 112 53 198 64 M24 -8 C20 24 31 58 27 106 M137 -6 C143 34 130 69 141 104" fill="none" stroke="#7C684A" stroke-width="0.55" opacity="${(0.075 * theme.texture).toFixed(3)}"/><circle cx="72" cy="43" r="0.8" fill="#6F5B3F" opacity="${(0.16 * theme.texture).toFixed(3)}"/></pattern>
     <radialGradient id="paperStainA"><stop offset="0" stop-color="#C99762" stop-opacity="0.08"/><stop offset="1" stop-color="#C99762" stop-opacity="0"/></radialGradient>
@@ -194,10 +185,25 @@ export function renderSvg(scene: Scene, options: RenderOptions = {}): string {
     }
     const accent = `<path d="${path}" fill="none" stroke="${edge.color}" stroke-width="0.9" stroke-dasharray="1 9" stroke-dashoffset="4" stroke-opacity="0.82"/>${ports}`;
     if (!edge.animated) return base + accent;
-    if (options.animatedSvg) return `${base}${accent}<circle r="5" fill="${edge.color}"><animateMotion dur="3.2s" begin="${(index % 7) * -0.37}s" repeatCount="indefinite" path="${path}"/></circle>`;
+    if (options.animatedSvg) {
+      const begin = (index % 7) * -0.37;
+      const signal = [
+        { radius: 2.1, opacity: 0.2, lag: 0.2 },
+        { radius: 2.7, opacity: 0.32, lag: 0.13 },
+        { radius: 3.2, opacity: 0.46, lag: 0.065 },
+        { radius: 8.5, opacity: 0.15, lag: 0 },
+        { radius: 4.1, opacity: 0.96, lag: 0 },
+      ].map((dot) => `<circle r="${dot.radius}" fill="${edge.color}" opacity="${dot.opacity}"><animateMotion dur="3.2s" begin="${begin - dot.lag}s" repeatCount="indefinite" path="${path}"/></circle>`).join("");
+      return `${base}${accent}<g class="atlas-signal" aria-label="${xml(edge.from)} 到 ${xml(edge.to)} 的动态信号">${signal}</g>`;
+    }
     if (options.frameProgress !== undefined) {
-      const point = pathPoint(edge, (options.frameProgress + index * 0.113) % 1);
-      return `${base}${accent}<circle cx="${point[0]}" cy="${point[1]}" r="7" fill="${edge.color}" opacity="0.22"/><circle cx="${point[0]}" cy="${point[1]}" r="3.2" fill="${edge.color}"/>`;
+      const phase = (options.frameProgress + index * 0.113) % 1;
+      const trail = [0.065, 0.042, 0.021].map((lag, trailIndex) => {
+        const point = pointAlongPath(edge, (phase - lag + 1) % 1);
+        return `<circle cx="${point[0]}" cy="${point[1]}" r="${2.1 + trailIndex * 0.5}" fill="${edge.color}" opacity="${0.2 + trailIndex * 0.13}"/>`;
+      }).join("");
+      const point = pointAlongPath(edge, phase);
+      return `${base}${accent}${trail}<circle cx="${point[0]}" cy="${point[1]}" r="9" fill="${edge.color}" opacity="0.16"/><circle cx="${point[0]}" cy="${point[1]}" r="4.1" fill="${edge.color}"/>`;
     }
     return base + accent;
   }).join("");
@@ -249,6 +255,15 @@ export function renderSvg(scene: Scene, options: RenderOptions = {}): string {
     return `<g id="node-${xml(node.id)}" transform="rotate(${angle} ${cx} ${cy})"><path d="${roughRect(washBox, `${node.id}-wash-a`, hand * 1.9, 22)}" fill="${color}" opacity="0.16" filter="url(#softWash)"/><path d="${roughRect({ x: washBox.x + 5, y: washBox.y - 2, width: washBox.width - 8, height: washBox.height + 3 }, `${node.id}-wash-b`, hand * 2.35, 25)}" fill="${color}" opacity="0.075" filter="url(#softWash)"/><path d="${roughRect({ x: b.x + 2.5, y: b.y + 4, width: b.width, height: b.height }, `${node.id}-color-echo`, hand * 1.14, 18)}" fill="none" stroke="${color}" stroke-width="2.1" opacity="0.58"/><path d="${roughRect(b, node.id, hand * 1.08, 17)}" fill="${theme.paper}" fill-opacity="0.82" stroke="${theme.ink}" stroke-width="1.45"/><path d="${roughRect({ x: b.x + 3, y: b.y + 3, width: b.width - 6, height: b.height - 6 }, `${node.id}-inner`, hand * 0.72, 14)}" fill="${color}" fill-opacity="0.035" stroke="${color}" stroke-width="0.9" opacity="0.62"/>${icon(node, b.x + 16, b.y + Math.max(12, b.height / 2 - 21), color, theme.ink)}${textLines(titleLines, titleX, titleY, titleSize + 2, `fill="${theme.ink}" font-family="${xml(theme.titleFont)}" font-size="${titleSize}" font-weight="700" letter-spacing="0.6"`)}${textLines(desc, titleX, descriptionY, 16, `fill="${theme.ink}" opacity="0.82" font-family="${xml(theme.bodyFont)}" font-size="${descriptionSize}"`)}</g>`;
   }).join("");
 
+  const nodePulses = options.animatedSvg ? `<g id="atlas-node-pulses" fill="none">${scene.nodes.map((node, nodeIndex) => {
+    const incomingIndex = scene.edges.findIndex((edge) => edge.animated && edge.to === node.id);
+    if (incomingIndex < 0) return "";
+    const group = scene.groups.find((item) => item.id === node.group)!;
+    const color = node.color ?? group.color;
+    const pulseBox = { x: node.box.x - 6, y: node.box.y - 6, width: node.box.width + 12, height: node.box.height + 12 };
+    return `<path d="${roughRect(pulseBox, `${node.id}-pulse`, hand * 0.75, 21)}" stroke="${color}" stroke-width="2.6" opacity="0"><animate attributeName="opacity" values="0;0;0.5;0" keyTimes="0;0.72;0.9;1" dur="3.2s" begin="${(incomingIndex % 7) * -0.37 + nodeIndex * -0.015}s" repeatCount="indefinite"/></path>`;
+  }).join("")}</g>` : "";
+
   const notes = (spec.notes ?? []).map((note, index) => {
     const anchor = note.anchor ?? (index % 2 ? "bottom-right" : "bottom-left");
     const color = note.color ?? theme.mutedInk;
@@ -271,5 +286,5 @@ export function renderSvg(scene: Scene, options: RenderOptions = {}): string {
   ].map(([color, label], index) => `<path d="M48 ${height - 94 + index * 18} C65 ${height - 97 + index * 18} 76 ${height - 91 + index * 18} 91 ${height - 94 + index * 18}" stroke="${color}" stroke-width="2.4" fill="none"/><text x="103" y="${height - 89 + index * 18}" fill="${theme.ink}" font-family="${xml(theme.bodyFont)}" font-size="12">${label}</text>`).join("")}</g>${spec.meta.description ? `<g transform="rotate(-1.2 ${width * 0.4} ${height - 58})">${textLines(wrapText(spec.meta.description, 18, 2), width * 0.36, height - 75, 19, `fill="${theme.palette[1]}" font-family="${xml(theme.titleFont)}" font-size="15"`)}<path d="M${width * 0.43} ${height - 99} q18 -24 34 -7" fill="none" stroke="${theme.palette[1]}" stroke-width="1.4"/><path d="M${width * 0.452} ${height - 95} l-7 -10 l12 1" fill="none" stroke="${theme.palette[1]}" stroke-width="1.4"/></g>` : ""}` : "";
 
   const corners = `<g fill="none" stroke="${theme.ink}" opacity="0.22"><path d="M20 42V20h22M${width - 42} 20h22v22M20 ${height - 42}v22h22M${width - 42} ${height - 20}h22v-22"/><circle cx="20" cy="20" r="5"/><circle cx="${width - 20}" cy="20" r="5"/><circle cx="20" cy="${height - 20}" r="5"/><circle cx="${width - 20}" cy="${height - 20}" r="5"/></g>`;
-  return `<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${defs}${background}${title}${groups}${edgeSvg}${nodes}${junctionSvg}${notes}${layeredDecorations}${corners}</svg>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${defs}${background}${title}${groups}${edgeSvg}${nodes}${nodePulses}${junctionSvg}${notes}${layeredDecorations}${corners}</svg>`;
 }

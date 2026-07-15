@@ -8,6 +8,7 @@ import { buildScene } from "../src/layout.js";
 import { renderSvg } from "../src/svg.js";
 import { renderExcalidraw } from "../src/excalidraw.js";
 import { exportScene, verifyOutputs } from "../src/exporters.js";
+import { paintMotionFrame } from "../src/motion.js";
 
 const exampleUrl = new URL("../examples/intelligent-collaboration.json", import.meta.url);
 
@@ -102,6 +103,9 @@ test("默认分层主题保留非对称构图、汇聚枢纽和手绘图例", as
   assert.match(svg, /id="atlas-junctions"/);
   assert.match(svg, /id="showcase-legend"/);
   assert.match(svg, /#CC654B|#cc654b/);
+  const rasterSvg = renderSvg(scene, { rasterOptimized: true });
+  assert.match(rasterSvg, /numOctaves="1"/);
+  assert.doesNotMatch(rasterSvg, /feDisplacementMap/);
 });
 
 test("展示模板包含参考构图的全部可编辑语义装饰", async () => {
@@ -125,12 +129,33 @@ test("SVG 与 Excalidraw 保留中文内容和唯一元素 ID", async () => {
   const svg = renderSvg(scene, { animatedSvg: true });
   assert.match(svg, /系统图谱/);
   assert.match(svg, /animateMotion/);
+  assert.match(svg, /id="atlas-node-pulses"/);
+  const animatedEdges = scene.edges.filter((edge) => edge.animated).length;
+  assert.equal(svg.match(/<animateMotion/g)?.length, animatedEdges * 5);
   const excalidraw = JSON.parse(renderExcalidraw(scene));
   const ids = excalidraw.elements.map((element: { id: string }) => element.id);
   const indices = excalidraw.elements.map((element: { index: string }) => element.index);
   assert.equal(ids.length, new Set(ids).size);
   assert.equal(indices.length, new Set(indices).size);
   assert.ok(excalidraw.elements.some((element: { text?: string }) => element.text === "系统图谱"));
+});
+
+test("轻量 GIF 动态层包含拖尾、光晕和节点响应", async () => {
+  const scene = buildScene(await fixture());
+  const bytes = scene.spec.canvas.width * scene.spec.canvas.height * 4;
+  const base = new Uint8Array(bytes);
+  base.fill(246);
+  for (let index = 3; index < bytes; index += 4) base[index] = 255;
+  const first = paintMotionFrame(scene, base, 0);
+  const later = paintMotionFrame(scene, base, 0.42);
+  let changedFromBase = 0;
+  let changedAcrossFrames = 0;
+  for (let index = 0; index < bytes; index += 4) {
+    if (first[index] !== base[index] || first[index + 1] !== base[index + 1] || first[index + 2] !== base[index + 2]) changedFromBase += 1;
+    if (first[index] !== later[index] || first[index + 1] !== later[index + 1] || first[index + 2] !== later[index + 2]) changedAcrossFrames += 1;
+  }
+  assert.ok(changedFromBase > 300, `动态像素过少：${changedFromBase}`);
+  assert.ok(changedAcrossFrames > 300, `跨帧变化过少：${changedAcrossFrames}`);
 });
 
 test("Windows 友好的中文路径可以输出主要静态格式", async () => {

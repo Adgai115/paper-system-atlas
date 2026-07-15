@@ -32,6 +32,31 @@ node dist/src/cli.js render `
   --verify
 ```
 
+## 文档一键生成
+
+`compose` 会把 Markdown 或 TXT 文档交给配置的模型，生成语义规格，经过 Zod 校验和自动修复后，再调用渲染引擎输出图像。这个入口补齐了“原文 → 规格 → 图像”的完整部署链路，不再需要人工编写 JSON。
+
+```powershell
+$env:PAPER_ATLAS_API_KEY = '<模型密钥>'
+$env:PAPER_ATLAS_MODEL = '<模型名称>'
+
+./scripts/compose.ps1 `
+  -InputDocument examples/ai-loop-source.md `
+  -Profile atlas-showcase `
+  -OutDir outputs/compose `
+  -BaseName ai-loop
+```
+
+模型适配配置：
+
+- 默认调用 `https://api.openai.com/v1/responses`，使用严格 JSON Schema 输出。
+- `PAPER_ATLAS_BASE_URL` 可切换到兼容端点。
+- `PAPER_ATLAS_API_STYLE=chat-completions` 可切换到 `/chat/completions`。
+- 同时兼容 `OPENAI_API_KEY`、`OPENAI_MODEL` 和 `OPENAI_BASE_URL`。
+- 密钥只从环境变量读取，不通过命令行参数传递。
+
+生成的 `<basename>.atlas.json` 会和图像一起保存在输出目录。模型输出不合法时，命令会把中文校验错误反馈给模型并自动重试，最多三次；所有输出始终经过本地校验和真实文件验证。
+
 ## 设计原则
 
 - 中文优先，技术缩写按需保留。

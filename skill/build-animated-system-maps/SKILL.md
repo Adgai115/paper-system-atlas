@@ -5,7 +5,7 @@ description: Create Chinese-first professional system architecture maps and arti
 
 # Build Animated System Maps
 
-Turn source material into a semantic system-map specification, then render verified editable and raster outputs with the bundled engine.
+Turn source material into a semantic system-map specification, then render verified editable and raster outputs with the bundled engine. Prefer the end-to-end `compose.ps1` entry when a model endpoint is configured; use `render.ps1` when the user already supplies a specification.
 
 ## Workflow
 
@@ -28,6 +28,22 @@ Turn source material into a semantic system-map specification, then render verif
 - Preserve sufficient whitespace for presentation and article cropping.
 
 ## Render
+
+For a Markdown or TXT source document, compose and render in one command:
+
+```powershell
+$env:PAPER_ATLAS_API_KEY = '<your-api-key>'
+$env:PAPER_ATLAS_MODEL = '<model-name>'
+./scripts/compose.ps1 `
+  -InputDocument <article.md> `
+  -Profile atlas-showcase `
+  -OutDir <output-directory> `
+  -BaseName <descriptive-name>
+```
+
+The endpoint defaults to the OpenAI Responses API. Set `PAPER_ATLAS_BASE_URL` for a compatible endpoint and `PAPER_ATLAS_API_STYLE=chat-completions` when the provider exposes Chat Completions instead.
+
+For an existing semantic specification:
 
 ```powershell
 ./scripts/render.ps1 `

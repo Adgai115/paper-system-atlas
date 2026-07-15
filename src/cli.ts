@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { access, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -8,6 +8,7 @@ import sharp from "sharp";
 import { parseAtlasSpec, formatValidationError } from "./schema.js";
 import { buildScene } from "./layout.js";
 import { exportScene, verifyOutputs, type OutputFormat } from "./exporters.js";
+import { composeDocument, createOpenAICompatibleClient, type ApiStyle, type ComposerProfile } from "./composer.js";
 
 interface Args { _: string[]; [key: string]: string[] | string | boolean; }
 
@@ -43,9 +44,7 @@ async function renderCommand(args: Args): Promise<void> {
     spec.layout.direction = args.layout === "lanes" ? "vertical" : "horizontal";
     if (args.layout !== "layered") spec.layout.profile = "adaptive";
   }
-  const formats = String(args.formats ?? "svg,png,excalidraw").split(",").map((item) => item.trim()).filter(Boolean) as OutputFormat[];
-  const supported = new Set<OutputFormat>(["svg", "png", "jpg", "gif", "excalidraw"]);
-  for (const format of formats) if (!supported.has(format)) throw new Error(`不支持的格式: ${format}`);
+  const formats = outputFormats(args);
   const scene = buildScene(spec);
   const result = await exportScene(scene, { outdir: required(args, "outdir"), basename: typeof args.basename === "string" ? args.basename : "system-map", formats });
   const report: Record<string, unknown> = { ok: true, result };
@@ -55,6 +54,52 @@ async function renderCommand(args: Args): Promise<void> {
   }
   console.log(JSON.stringify(report, null, 2));
   if (report.ok === false) process.exitCode = 1;
+}
+
+function outputFormats(args: Args): OutputFormat[] {
+  const formats = String(args.formats ?? "svg,png,excalidraw").split(",").map((item) => item.trim()).filter(Boolean) as OutputFormat[];
+  const supported = new Set<OutputFormat>(["svg", "png", "jpg", "gif", "excalidraw"]);
+  for (const format of formats) if (!supported.has(format)) throw new Error(`不支持的格式: ${format}`);
+  return formats;
+}
+
+async function composeCommand(args: Args): Promise<void> {
+  const inputPath = path.resolve(required(args, "input"));
+  const document = await readFile(inputPath, "utf8");
+  const profile = String(args.profile ?? "atlas-showcase") as ComposerProfile;
+  if (!(profile === "atlas-showcase" || profile === "adaptive")) throw new Error(`不支持的配置: ${profile}`);
+  const apiStyle = String(args["api-style"] ?? process.env.PAPER_ATLAS_API_STYLE ?? "responses") as ApiStyle;
+  if (!(apiStyle === "responses" || apiStyle === "chat-completions")) throw new Error(`不支持的模型接口风格: ${apiStyle}`);
+  const apiKey = process.env.PAPER_ATLAS_API_KEY ?? process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("未配置模型密钥。请设置 PAPER_ATLAS_API_KEY 或 OPENAI_API_KEY 环境变量");
+  const model = typeof args.model === "string" ? args.model : process.env.PAPER_ATLAS_MODEL ?? process.env.OPENAI_MODEL;
+  if (!model) throw new Error("未配置模型。请使用 --model 或设置 PAPER_ATLAS_MODEL / OPENAI_MODEL");
+  const baseUrl = typeof args["base-url"] === "string" ? args["base-url"] : process.env.PAPER_ATLAS_BASE_URL ?? process.env.OPENAI_BASE_URL;
+  const maxAttempts = Number(args["max-attempts"] ?? 3);
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 4) throw new Error("--max-attempts 必须是 1-4 的整数");
+
+  const composed = await composeDocument({
+    document,
+    profile,
+    maxAttempts,
+    client: createOpenAICompatibleClient({ apiKey, baseUrl, model, apiStyle }),
+  });
+  const outdir = path.resolve(required(args, "outdir"));
+  const basename = typeof args.basename === "string" ? args.basename : path.parse(inputPath).name;
+  const specPath = path.resolve(typeof args["spec-out"] === "string" ? args["spec-out"] : path.join(outdir, `${basename}.atlas.json`));
+  await mkdir(path.dirname(specPath), { recursive: true });
+  await writeFile(specPath, `${JSON.stringify(composed.spec, null, 2)}\n`, "utf8");
+
+  const result = await exportScene(buildScene(composed.spec), { outdir, basename, formats: outputFormats(args) });
+  const verification = await verifyOutputs(result, composed.spec);
+  const report = {
+    ok: verification.ok,
+    composition: { profile, provider: composed.provider, model: composed.model, attempts: composed.attempts, input: inputPath, spec: specPath },
+    result,
+    verification,
+  };
+  console.log(JSON.stringify(report, null, 2));
+  if (!verification.ok) process.exitCode = 1;
 }
 
 async function validateCommand(args: Args): Promise<void> {
@@ -83,14 +128,15 @@ async function doctorCommand(): Promise<void> {
 }
 
 function usage(): void {
-  console.log(`纸上系统图谱 CLI\n\n命令:\n  render   生成 SVG/PNG/JPG/GIF/Excalidraw，可用 --layout 覆盖布局\n  validate 校验规格\n  doctor   检查 Windows 与运行环境\n\n示例:\n  paper-atlas render --spec examples/intelligent-collaboration.json --outdir outputs --basename demo --layout radial --formats svg,png,jpg,gif,excalidraw --verify`);
+  console.log(`纸上系统图谱 CLI\n\n命令:\n  compose  将 Markdown/TXT 文档编排为规格并生成全部图像\n  render   根据规格生成 SVG/PNG/JPG/GIF/Excalidraw，可用 --layout 覆盖布局\n  validate 校验规格\n  doctor   检查 Windows 与运行环境\n\n模型环境变量:\n  PAPER_ATLAS_API_KEY   模型密钥（也支持 OPENAI_API_KEY）\n  PAPER_ATLAS_MODEL     模型名称（也支持 OPENAI_MODEL）\n  PAPER_ATLAS_BASE_URL  API 根地址，默认 https://api.openai.com/v1\n  PAPER_ATLAS_API_STYLE responses 或 chat-completions\n\n示例:\n  paper-atlas compose --input article.md --profile atlas-showcase --outdir outputs --basename article-map --formats svg,png,jpg,gif,excalidraw\n  paper-atlas render --spec examples/intelligent-collaboration.json --outdir outputs --basename demo --layout radial --formats svg,png,jpg,gif,excalidraw --verify`);
 }
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const command = args._[0];
   if (!command || command === "help" || args.help) { usage(); return; }
-  if (command === "render") await renderCommand(args);
+  if (command === "compose") await composeCommand(args);
+  else if (command === "render") await renderCommand(args);
   else if (command === "validate") await validateCommand(args);
   else if (command === "doctor") await doctorCommand();
   else throw new Error(`未知命令: ${command}`);

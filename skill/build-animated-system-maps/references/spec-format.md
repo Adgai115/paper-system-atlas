@@ -28,6 +28,8 @@
 
 颜色必须使用 `#RRGGBB`。默认纸张主题位于 `assets/paper-color-theme.json`。Windows 默认优先使用楷体和微软雅黑；跨平台发行版应随包提供开放许可字体。
 
+CLI 主题预设为 `paper-color`、`blueprint`、`whiteboard`、`ink-wash`；画布预设为 `presentation`、`article`、`wechat`、`square`、`print-a4`。运行 `paper-atlas presets` 获取机器可读目录，运行 `paper-atlas plan --spec <file>` 获取内容驱动建议。
+
 ## 布局选择
 
 - `layered`: 从左到右的架构层、处理链和文章解释图。
@@ -35,3 +37,11 @@
 - `radial`: 中心平台与外围能力、生态或事件总线。中心枢纽使用 `layout.hub.title`、`description` 和可选 `color`。
 
 优先通过分组和连线改变布局，不要在文案中塞入空格或换行来强行控制位置。
+
+## Agent 输出契约
+
+- `plan` 只分析，不写图像；读取 `recommendation`、`risks` 和 `nextCommand`。
+- `render`、`preview`、`compose` 成功时向 stdout 写 JSON；验证失败时 `ok` 为 `false`。
+- `batch` 写 `batch-manifest.json`，每个项目包含实际使用的预设、文件路径、验证结果或结构化错误。
+- `--input -` 和 `--spec -` 从 stdin 读取，便于其他 Agent 避免临时文件。
+- stderr 错误对象包含 `error.code`、`error.message` 和 `exitCode`。

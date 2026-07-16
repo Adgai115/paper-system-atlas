@@ -1,6 +1,6 @@
 # Paper System Atlas
 
-一个中文优先、纸张彩色手绘风格的语义化系统地图引擎。
+一个面向 Agent 的中文优先、纸张彩色手绘风格语义化系统地图工具、Skill 与可部署 CLI。
 
 它从内容规格自动计算布局，以 SVG 作为主要可编辑格式，同时输出 PNG、JPG、GIF 和 Excalidraw。项目使用独立协议、场景模型、布局算法和渲染实现。
 
@@ -15,7 +15,7 @@
 
 ```powershell
 npm run package:windows
-npm install -g ./dist-package/paper-system-atlas-0.2.0.tgz
+npm install -g ./dist-package/paper-system-atlas-0.3.0.tgz
 paper-atlas doctor
 ```
 
@@ -54,6 +54,37 @@ paper-atlas preview `
 
 单独控制布局集合可使用 `--layouts layered,radial`。预览命令默认输出 PNG 和 SVG，并始终保留用于对比拼图的 PNG。
 
+## Agent 自动化接口
+
+v0.3 的重点是让其他 Agent 可以规划、调用、校验和接续处理，不依赖网页端。
+
+先对原文或规格做低成本规划：
+
+```powershell
+paper-atlas plan --input examples/ai-loop-source.md
+paper-atlas plan --spec examples/intelligent-collaboration.json
+```
+
+结果包含推荐的布局、主题、画布、格式、理由、风险、候选布局评分和下一条命令。主题预设为 `paper-color`、`blueprint`、`whiteboard`、`ink-wash`；画布预设为 `presentation`、`article`、`wechat`、`square`、`print-a4`。运行 `paper-atlas presets` 可读取完整 JSON 目录。
+
+批量处理规格目录：
+
+```powershell
+paper-atlas batch `
+  --input examples `
+  --outdir outputs/batch `
+  --layout auto `
+  --formats svg,png,excalidraw
+```
+
+批处理默认逐项自动选择布局、主题和画布，并执行真实产物校验。无效规格不会阻断后续项目；最终状态、实际参数、文件路径、验证结果和单项错误统一写入 `batch-manifest.json`。
+
+CLI 支持 `--input -` 和 `--spec -` 从标准输入读取。正常结果写入 stdout JSON，错误写入 stderr JSON；稳定退出码为 `1`（执行或验证失败）、`2`（参数或输入无效）、`3`（模型配置失败）、`4`（文件系统失败）。
+
+```powershell
+Get-Content -Raw examples/ai-loop-source.md | paper-atlas plan --input -
+```
+
 ## 文档一键生成
 
 `compose` 会把 Markdown 或 TXT 文档交给配置的模型，生成语义规格，经过 Zod 校验和自动修复后，再调用渲染引擎输出图像。这个入口补齐了“原文 → 规格 → 图像”的完整部署链路，不再需要人工编写 JSON。
@@ -82,6 +113,7 @@ $env:PAPER_ATLAS_MODEL = '<模型名称>'
 ## 设计原则
 
 - 中文优先，技术缩写按需保留。
+- Agent、Skill 和插件调用是主要交互面，不要求浏览器 UI。
 - 内容描述与视觉布局分离。
 - SVG 是统一场景表达，Excalidraw 是必须支持的编辑出口。
 - 纸张、墨线和彩色水洗是默认风格，主题字段允许完全自定义。
@@ -137,4 +169,4 @@ AI Loop 测试示例同时展示两种配置：
 
 ## 当前状态
 
-当前为原创 v0.2 开发版本，许可证与最终公开项目名称尚未确定。
+当前为原创 v0.3 开发版本，许可证与最终公开项目名称尚未确定。

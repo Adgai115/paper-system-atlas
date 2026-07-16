@@ -1,9 +1,9 @@
 {
   "name": "paper-system-atlas",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Chinese-first paper-style animated system map renderer",
+  "description": "Agent-first Chinese paper-style system-map planning and rendering toolkit",
   "bin": {
     "paper-atlas": "dist/src/cli.js"
   },
@@ -15,7 +15,8 @@
     "skill/build-animated-system-maps/**/*"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "clean:build": "node scripts/clean-build.mjs",
+    "build": "npm run clean:build && tsc -p tsconfig.json",
     "dev": "tsx src/cli.ts",
     "render:example": "tsx src/cli.ts render --spec examples/intelligent-collaboration.json --outdir outputs --basename intelligent-collaboration --formats svg,png,jpg,gif,excalidraw --verify",
     "render:visuals": "powershell -ExecutionPolicy Bypass -File scripts/render-visual-samples.ps1",

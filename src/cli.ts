@@ -10,6 +10,9 @@ import { buildScene } from "./layout.js";
 import { exportScene, verifyOutputs, type OutputFormat } from "./exporters.js";
 import { composeDocument, createOpenAICompatibleClient, type ApiStyle, type ComposerProfile } from "./composer.js";
 import type { AtlasSpec, LayoutMode } from "./types.js";
+import { applyCanvasPreset, applyThemePreset, presetCatalog } from "./presets.js";
+import { planDocument, planSpec } from "./planner.js";
+import { runBatch } from "./batch.js";
 
 interface Args { _: string[]; [key: string]: string[] | string | boolean; }
 
@@ -32,13 +35,60 @@ function required(args: Args, key: string): string {
   return value;
 }
 
+async function readTextSource(source: string): Promise<string> {
+  if (source !== "-") return readFile(path.resolve(source), "utf8");
+  let content = "";
+  process.stdin.setEncoding("utf8");
+  for await (const chunk of process.stdin) content += chunk;
+  if (!content.trim()) throw new Error("标准输入为空");
+  return content;
+}
+
+function sourceBasename(source: string, fallback = "stdin-map"): string {
+  return source === "-" ? fallback : path.parse(source).name;
+}
+
 async function loadSpec(filePath: string) {
-  const raw = JSON.parse(await readFile(path.resolve(filePath), "utf8"));
+  const raw = JSON.parse(await readTextSource(filePath));
   return parseAtlasSpec(raw);
 }
 
+async function planCommand(args: Args): Promise<void> {
+  const specPath = typeof args.spec === "string" ? args.spec : undefined;
+  const inputPath = typeof args.input === "string" ? args.input : undefined;
+  if (Boolean(specPath) === Boolean(inputPath)) throw new Error("plan 必须且只能提供 --spec 或 --input");
+  const plan = specPath
+    ? planSpec(await loadSpec(specPath), specPath)
+    : planDocument(await readTextSource(inputPath!), inputPath);
+  console.log(JSON.stringify(plan, null, 2));
+}
+
+async function batchCommand(args: Args): Promise<void> {
+  const layout = String(args.layout ?? "auto");
+  if (!(layout === "auto" || ["layered", "lanes", "radial"].includes(layout))) throw new Error(`不支持的批量布局: ${layout}`);
+  const report = await runBatch({
+    input: required(args, "input"),
+    outdir: required(args, "outdir"),
+    recursive: args.recursive === true,
+    verify: args["no-verify"] !== true,
+    layout: layout as LayoutMode | "auto",
+    theme: typeof args.theme === "string" ? args.theme : "auto",
+    canvas: typeof args.canvas === "string" ? args.canvas : "auto",
+    formats: typeof args.formats === "string" ? outputFormats(args) : undefined,
+    manifest: typeof args.manifest === "string" ? args.manifest : undefined,
+  });
+  console.log(JSON.stringify(report, null, 2));
+  if (!report.ok) process.exitCode = 1;
+}
+
+function applySpecOverrides(spec: AtlasSpec, args: Args): AtlasSpec {
+  if (typeof args.theme === "string") applyThemePreset(spec, args.theme);
+  if (typeof args.canvas === "string") applyCanvasPreset(spec, args.canvas);
+  return spec;
+}
+
 async function renderCommand(args: Args): Promise<void> {
-  const spec = await loadSpec(required(args, "spec"));
+  const spec = applySpecOverrides(await loadSpec(required(args, "spec")), args);
   if (typeof args.layout === "string") {
     if (!(["layered", "lanes", "radial"] as string[]).includes(args.layout)) throw new Error(`不支持的布局: ${args.layout}`);
     spec.layout.mode = args.layout as "layered" | "lanes" | "radial";
@@ -91,14 +141,15 @@ async function createPreviewSheet(spec: AtlasSpec, previews: Array<{ layout: Lay
 }
 
 async function previewCommand(args: Args): Promise<void> {
-  const original = await loadSpec(required(args, "spec"));
+  const specSource = required(args, "spec");
+  const original = applySpecOverrides(await loadSpec(specSource), args);
   const requested = String(args.layouts ?? "layered,lanes,radial").split(",").map((item) => item.trim()).filter(Boolean);
   const supported = new Set<LayoutMode>(["layered", "lanes", "radial"]);
   for (const layout of requested) if (!supported.has(layout as LayoutMode)) throw new Error(`不支持的预览布局: ${layout}`);
   const layouts = [...new Set(requested)] as LayoutMode[];
   if (layouts.length === 0) throw new Error("--layouts 至少需要一个布局");
   const outdir = path.resolve(required(args, "outdir"));
-  const basename = typeof args.basename === "string" ? args.basename : path.parse(required(args, "spec")).name;
+  const basename = typeof args.basename === "string" ? args.basename : sourceBasename(specSource);
   const formats = outputFormats(args, "png,svg");
   if (!formats.includes("png")) formats.push("png");
   const layoutDir = path.join(outdir, "layouts");
@@ -123,8 +174,9 @@ async function previewCommand(args: Args): Promise<void> {
 }
 
 async function composeCommand(args: Args): Promise<void> {
-  const inputPath = path.resolve(required(args, "input"));
-  const document = await readFile(inputPath, "utf8");
+  const inputSource = required(args, "input");
+  const inputPath = inputSource === "-" ? "stdin" : path.resolve(inputSource);
+  const document = await readTextSource(inputSource);
   const profile = String(args.profile ?? "atlas-showcase") as ComposerProfile;
   if (!(profile === "atlas-showcase" || profile === "adaptive")) throw new Error(`不支持的配置: ${profile}`);
   const apiStyle = String(args["api-style"] ?? process.env.PAPER_ATLAS_API_STYLE ?? "responses") as ApiStyle;
@@ -143,8 +195,9 @@ async function composeCommand(args: Args): Promise<void> {
     maxAttempts,
     client: createOpenAICompatibleClient({ apiKey, baseUrl, model, apiStyle }),
   });
+  applySpecOverrides(composed.spec, args);
   const outdir = path.resolve(required(args, "outdir"));
-  const basename = typeof args.basename === "string" ? args.basename : path.parse(inputPath).name;
+  const basename = typeof args.basename === "string" ? args.basename : sourceBasename(inputSource);
   const specPath = path.resolve(typeof args["spec-out"] === "string" ? args["spec-out"] : path.join(outdir, `${basename}.atlas.json`));
   await mkdir(path.dirname(specPath), { recursive: true });
   await writeFile(specPath, `${JSON.stringify(composed.spec, null, 2)}\n`, "utf8");
@@ -187,22 +240,31 @@ async function doctorCommand(): Promise<void> {
 }
 
 function usage(): void {
-  console.log(`纸上系统图谱 CLI\n\n命令:\n  compose  将 Markdown/TXT 文档编排为规格并生成全部图像\n  render   根据规格生成 SVG/PNG/JPG/GIF/Excalidraw，可用 --layout 覆盖布局\n  preview  一次生成多种布局并输出对比拼图\n  validate 校验规格\n  doctor   检查 Windows 与运行环境\n\n模型环境变量:\n  PAPER_ATLAS_API_KEY   模型密钥（也支持 OPENAI_API_KEY）\n  PAPER_ATLAS_MODEL     模型名称（也支持 OPENAI_MODEL）\n  PAPER_ATLAS_BASE_URL  API 根地址，默认 https://api.openai.com/v1\n  PAPER_ATLAS_API_STYLE responses 或 chat-completions\n\n示例:\n  paper-atlas compose --input article.md --profile atlas-showcase --outdir outputs --basename article-map --formats svg,png,jpg,gif,excalidraw\n  paper-atlas render --spec examples/intelligent-collaboration.json --outdir outputs --basename demo --layout radial --formats svg,png,jpg,gif,excalidraw --verify\n  paper-atlas preview --spec examples/intelligent-collaboration.json --outdir outputs/preview --basename demo --verify`);
+  console.log(`纸上系统图谱 CLI\n\n命令:\n  plan     为文档或规格输出机器可读的布局、主题与格式建议\n  batch    批量渲染规格并输出统一 manifest（默认自动规划且逐项校验）\n  compose  将 Markdown/TXT 文档编排为规格并生成全部图像\n  render   根据规格生成 SVG/PNG/JPG/GIF/Excalidraw，可用 --layout 覆盖布局\n  preview  一次生成多种布局并输出对比拼图\n  presets  查看主题与画布预设\n  validate 校验规格\n  doctor   检查 Windows 与运行环境\n\nAgent 接口约定:\n  --input - / --spec - 从标准输入读取；成功写 JSON 到 stdout，失败写 JSON 到 stderr\n  退出码 1=执行或校验失败，2=参数或输入无效，3=模型配置失败，4=文件系统失败\n\n通用视觉参数:\n  --theme  paper-color、blueprint、whiteboard 或 ink-wash\n  --canvas presentation、article、wechat、square 或 print-a4\n\n模型环境变量:\n  PAPER_ATLAS_API_KEY   模型密钥（也支持 OPENAI_API_KEY）\n  PAPER_ATLAS_MODEL     模型名称（也支持 OPENAI_MODEL）\n  PAPER_ATLAS_BASE_URL  API 根地址，默认 https://api.openai.com/v1\n  PAPER_ATLAS_API_STYLE responses 或 chat-completions\n\n示例:\n  paper-atlas plan --input article.md\n  Get-Content -Raw article.md | paper-atlas plan --input -\n  paper-atlas plan --spec examples/intelligent-collaboration.json\n  paper-atlas batch --input examples --outdir outputs/batch --layout auto --formats svg,png,excalidraw\n  paper-atlas compose --input article.md --profile atlas-showcase --outdir outputs --basename article-map --formats svg,png,jpg,gif,excalidraw\n  paper-atlas render --spec examples/intelligent-collaboration.json --outdir outputs --basename demo --layout radial --theme blueprint --canvas presentation --formats svg,png,excalidraw --verify\n  paper-atlas preview --spec examples/intelligent-collaboration.json --outdir outputs/preview --basename demo --verify`);
 }
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const command = args._[0];
   if (!command || command === "help" || args.help) { usage(); return; }
-  if (command === "compose") await composeCommand(args);
+  if (command === "plan") await planCommand(args);
+  else if (command === "batch") await batchCommand(args);
+  else if (command === "compose") await composeCommand(args);
   else if (command === "render") await renderCommand(args);
   else if (command === "preview") await previewCommand(args);
+  else if (command === "presets") console.log(JSON.stringify(presetCatalog(), null, 2));
   else if (command === "validate") await validateCommand(args);
   else if (command === "doctor") await doctorCommand();
   else throw new Error(`未知命令: ${command}`);
 }
 
 main().catch((error) => {
-  console.error(`错误: ${formatValidationError(error)}`);
-  process.exitCode = 1;
+  const message = formatValidationError(error);
+  const filesystemCode = typeof error === "object" && error !== null && "code" in error ? String((error as { code: unknown }).code) : "";
+  const providerFailure = /模型密钥|未配置模型|模型接口风格/.test(message);
+  const argumentFailure = error instanceof SyntaxError || /缺少必需参数|不支持|未知命令|必须|输入文档内容过短|标准输入为空|规格/.test(message);
+  const exitCode = providerFailure ? 3 : filesystemCode && ["ENOENT", "EACCES", "EPERM", "ENOSPC"].includes(filesystemCode) ? 4 : argumentFailure ? 2 : 1;
+  const code = providerFailure ? "provider_config_error" : exitCode === 4 ? "filesystem_error" : exitCode === 2 ? "invalid_input" : "command_failed";
+  console.error(JSON.stringify({ ok: false, error: { code, message }, exitCode }, null, 2));
+  process.exitCode = exitCode;
 });

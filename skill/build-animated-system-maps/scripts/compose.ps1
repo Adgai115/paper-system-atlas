@@ -9,7 +9,9 @@ param(
     [string]$BaseUrl,
     [ValidateSet('responses', 'chat-completions')][string]$ApiStyle,
     [ValidateRange(1, 4)][int]$MaxAttempts = 3,
-    [string]$SpecOut
+    [string]$SpecOut,
+    [ValidateSet('paper-color', 'blueprint', 'whiteboard', 'ink-wash')][string]$Theme,
+    [ValidateSet('presentation', 'article', 'wechat', 'square', 'print-a4')][string]$Canvas
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,6 +27,8 @@ if ($Model) { $Arguments += @('--model', $Model) }
 if ($BaseUrl) { $Arguments += @('--base-url', $BaseUrl) }
 if ($ApiStyle) { $Arguments += @('--api-style', $ApiStyle) }
 if ($SpecOut) { $Arguments += @('--spec-out', $SpecOut) }
+if ($Theme) { $Arguments += @('--theme', $Theme) }
+if ($Canvas) { $Arguments += @('--canvas', $Canvas) }
 
 if (Test-Path $LocalCli) {
     & node $LocalCli @Arguments

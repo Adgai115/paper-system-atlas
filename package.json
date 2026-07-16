@@ -39,7 +39,7 @@
     "render:example": "tsx src/cli.ts render --spec examples/intelligent-collaboration.json --outdir outputs --basename intelligent-collaboration --formats svg,png,jpg,gif,excalidraw --verify",
     "render:smoke": "node dist/src/cli.js render --spec examples/ai-loop-adaptive.json --outdir outputs/ci-smoke --basename ci-smoke --formats svg,png,excalidraw --verify",
     "render:visuals": "powershell -ExecutionPolicy Bypass -File scripts/render-visual-samples.ps1",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "test": "node scripts/run-tests.mjs",
     "check": "npm run build && npm test",
     "prepack": "npm run build",
     "pack:check": "npm test && npm pack --dry-run",

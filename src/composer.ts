@@ -6,7 +6,7 @@ export type ComposerProfile = "atlas-showcase" | "adaptive";
 export type ApiStyle = "responses" | "chat-completions";
 
 const icons = ["chat", "calendar", "voice", "document", "target", "plan", "route", "shield", "browser", "knowledge", "code", "media", "report", "message", "dashboard", "archive", "memory"] as const;
-const palette = ["#CC654B", "#2D8585", "#3569A7", "#C18A37", "#7567A2"];
+const palette = ["#B04A37", "#1E7772", "#3569A7", "#906314", "#705B98"];
 
 const semanticSchema = z.object({
   meta: z.object({
@@ -77,7 +77,10 @@ export interface OpenAICompatibleConfig {
   model: string;
   apiStyle?: ApiStyle;
   timeoutMs?: number;
+  maxRetries?: number;
+  retryDelayMs?: number;
   fetchImpl?: typeof fetch;
+  sleepImpl?: (delayMs: number) => Promise<void>;
 }
 
 export interface ComposeRequest {
@@ -170,10 +173,45 @@ function extractResponseText(payload: unknown): string {
   throw new Error("模型响应中没有可解析的文本内容");
 }
 
+class ModelHttpError extends Error {
+  constructor(readonly status: number, readonly retryAfterMs: number | undefined, body: string) {
+    super(`模型接口返回 HTTP ${status}: ${body.slice(0, 1200)}`);
+    this.name = "ModelHttpError";
+  }
+}
+
+const retryableStatuses = new Set([408, 409, 425, 429, 500, 502, 503, 504]);
+
+function retryAfterMs(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(30_000, seconds * 1000);
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return undefined;
+  return Math.min(30_000, Math.max(0, timestamp - Date.now()));
+}
+
+function isRetryableRequestError(error: unknown): boolean {
+  if (error instanceof ModelHttpError) return retryableStatuses.has(error.status);
+  if (!(error instanceof Error)) return false;
+  if (error.name === "AbortError" || error.name === "TimeoutError" || error instanceof TypeError) return true;
+  const code = "code" in error ? String((error as Error & { code?: unknown }).code) : "";
+  return ["ECONNRESET", "ECONNREFUSED", "EAI_AGAIN", "ENETUNREACH", "ETIMEDOUT", "UND_ERR_CONNECT_TIMEOUT"].includes(code);
+}
+
+function describeRequestError(error: unknown): string {
+  if (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError")) return "模型接口请求超时";
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function createOpenAICompatibleClient(config: OpenAICompatibleConfig): TextModelClient {
   const apiStyle = config.apiStyle ?? "responses";
   const baseUrl = (config.baseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
   const requestFetch = config.fetchImpl ?? fetch;
+  const timeoutMs = Math.max(1, config.timeoutMs ?? 120_000);
+  const maxRetries = Math.max(0, Math.min(5, config.maxRetries ?? 2));
+  const retryDelayMs = Math.max(0, Math.min(30_000, config.retryDelayMs ?? 500));
+  const sleep = config.sleepImpl ?? ((delayMs: number) => new Promise<void>((resolve) => setTimeout(resolve, delayMs)));
   return {
     provider: `openai-compatible:${apiStyle}`,
     model: config.model,
@@ -187,16 +225,29 @@ export function createOpenAICompatibleClient(config: OpenAICompatibleConfig): Te
             response_format: { type: "json_schema", json_schema: { name: format.name, strict: format.strict, schema: format.schema } },
           };
       const endpoint = apiStyle === "responses" ? `${baseUrl}/responses` : `${baseUrl}/chat/completions`;
-      const response = await requestFetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(config.timeoutMs ?? 120_000),
-      });
-      const responseBody = await response.text();
-      if (!response.ok) throw new Error(`模型接口返回 HTTP ${response.status}: ${responseBody.slice(0, 1200)}`);
-      try { return extractResponseText(JSON.parse(responseBody)); }
-      catch (error) { throw new Error(`无法解析模型响应: ${error instanceof Error ? error.message : String(error)}`); }
+      for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+        try {
+          const response = await requestFetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(timeoutMs),
+          });
+          const responseBody = await response.text();
+          if (!response.ok) throw new ModelHttpError(response.status, retryAfterMs(response.headers.get("retry-after")), responseBody);
+          try { return extractResponseText(JSON.parse(responseBody)); }
+          catch (error) { throw new Error(`无法解析模型响应: ${error instanceof Error ? error.message : String(error)}`); }
+        } catch (error) {
+          if (attempt >= maxRetries || !isRetryableRequestError(error)) {
+            const attempts = attempt + 1;
+            throw new Error(`模型接口请求失败（${attempts} 次尝试）：${describeRequestError(error)}`, { cause: error });
+          }
+          const retryAfter = error instanceof ModelHttpError ? error.retryAfterMs : undefined;
+          const delay = retryAfter ?? Math.min(30_000, retryDelayMs * 2 ** attempt);
+          if (delay > 0) await sleep(delay);
+        }
+      }
+      throw new Error("模型接口请求失败");
     },
   };
 }

@@ -1,14 +1,25 @@
 # Paper System Atlas
 
+[![CI](https://github.com/Adgai115/paper-system-atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/Adgai115/paper-system-atlas/actions/workflows/ci.yml)
+
 一个面向 Agent 的中文优先、纸张彩色手绘风格语义化系统地图工具、Skill 与可部署 CLI。
 
 它从内容规格自动计算布局，以 SVG 作为主要可编辑格式，同时输出 PNG、JPG、GIF 和 Excalidraw。项目使用独立协议、场景模型、布局算法和渲染实现。
 
-## Windows 快速开始
+## 快速开始
+
+Windows：
 
 ```powershell
 ./scripts/setup.ps1
 ./scripts/render-example.ps1
+```
+
+Linux / macOS：
+
+```bash
+bash scripts/setup.sh
+bash scripts/render-example.sh
 ```
 
 如果只需要部署工具，不需要源码和测试，可生成紧凑安装包：
@@ -16,6 +27,19 @@
 ```powershell
 npm run package:windows
 npm install -g ./dist-package/paper-system-atlas-0.3.0.tgz
+paper-atlas doctor
+```
+
+Linux / macOS 可生成同样的 npm 安装包；系统存在 `zip` 时还会生成 Skill 压缩包：
+
+```bash
+npm run package:unix
+```
+
+项目已配置为 public npm 包，并通过 GitHub Release 工作流执行带 provenance 的发布。正式版本发布后可直接安装：
+
+```bash
+npm install -g paper-system-atlas
 paper-atlas doctor
 ```
 
@@ -105,10 +129,15 @@ $env:PAPER_ATLAS_MODEL = '<模型名称>'
 - 默认调用 `https://api.openai.com/v1/responses`，使用严格 JSON Schema 输出。
 - `PAPER_ATLAS_BASE_URL` 可切换到兼容端点。
 - `PAPER_ATLAS_API_STYLE=chat-completions` 可切换到 `/chat/completions`。
+- `PAPER_ATLAS_API_TIMEOUT_MS` 设置单次 HTTP 请求超时，默认 120000 毫秒。
+- `PAPER_ATLAS_API_RETRIES` 设置超时、HTTP 408/409/425/429 和 5xx 的重试次数，默认 2 次。
+- `PAPER_ATLAS_API_RETRY_DELAY_MS` 设置指数退避初始间隔，默认 500 毫秒；服务端 `Retry-After` 优先。
 - 同时兼容 `OPENAI_API_KEY`、`OPENAI_MODEL` 和 `OPENAI_BASE_URL`。
 - 密钥只从环境变量读取，不通过命令行参数传递。
 
 生成的 `<basename>.atlas.json` 会和图像一起保存在输出目录。模型输出不合法时，命令会把中文校验错误反馈给模型并自动重试，最多三次；所有输出始终经过本地校验和真实文件验证。
+
+HTTP 重试与模型语义修复分别计数。网络抖动、限流或暂时性服务错误不会消耗 `--max-attempts` 的语义修复次数。CLI 可通过 `--api-timeout-ms`、`--api-retries` 和 `--api-retry-delay-ms` 覆盖上述环境变量。
 
 ## 设计原则
 
@@ -164,8 +193,11 @@ AI Loop 测试示例同时展示两种配置：
 - 径向枢纽是否侵入外围分区。
 - 连线是否穿过无关节点。
 - 文字截断风险、画布密度、超长路径和连线标签碰撞。
+- 主题墨色、辅助文字与语义色相对纸张背景是否达到 WCAG AA 4.5:1 对比度。
 
 结构性问题会令命令失败；可读性风险记录在 `warnings` 中，便于继续调整规格而不误判文件损坏。
+
+测试套件会校验 8 分区、64 节点、160 连线的规格上限，并使用 8 分区、32 节点、64 连线的高密度图在分层、泳道和径向三种布局上验证有限坐标、SVG 与 Excalidraw。GitHub Actions 会在 Windows、Linux 和 macOS 上执行构建、测试、真实渲染冒烟测试与 npm 打包检查。
 
 ## 当前状态
 

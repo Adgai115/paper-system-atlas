@@ -9,6 +9,9 @@ param(
     [string]$BaseUrl,
     [ValidateSet('responses', 'chat-completions')][string]$ApiStyle,
     [ValidateRange(1, 4)][int]$MaxAttempts = 3,
+    [ValidateRange(100, 600000)][int]$ApiTimeoutMs = 120000,
+    [ValidateRange(0, 5)][int]$ApiRetries = 2,
+    [ValidateRange(0, 30000)][int]$ApiRetryDelayMs = 500,
     [string]$SpecOut
 )
 

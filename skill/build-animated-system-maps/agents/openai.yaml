@@ -1,7 +1,7 @@
 interface:
   display_name: "纸上系统图谱"
   short_description: "为 Agent 规划、批量生成并校验可编辑纸张风格系统图"
-  brand_color: "#CC654B"
+  brand_color: "#B04A37"
   default_prompt: "Use $build-animated-system-maps to plan and render this content as verified editable system-map artifacts."
 policy:
   allow_implicit_invocation: true

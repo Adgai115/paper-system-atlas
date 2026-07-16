@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { parseAtlasSpec } from "../src/schema.js";
 import { applyCanvasPreset, applyThemePreset, presetCatalog } from "../src/presets.js";
+import { contrastRatio, themeContrastIssues } from "../src/accessibility.js";
 
 async function fixture() {
   return parseAtlasSpec(JSON.parse(await readFile(new URL("../examples/intelligent-collaboration.json", import.meta.url), "utf8")));
@@ -25,4 +26,14 @@ test("画布预设与目录可用于 CLI 和 Agent", async () => {
   assert.ok(catalog.themes.length >= 4);
   assert.ok(catalog.canvases.length >= 5);
   assert.throws(() => applyThemePreset(spec, "missing"), /未知主题预设/);
+});
+
+test("全部内置主题的文字与语义色满足 WCAG AA 对比度", async () => {
+  const catalog = presetCatalog() as { themes: Array<{ id: string }> };
+  for (const { id } of catalog.themes) {
+    const spec = await fixture();
+    applyThemePreset(spec, id);
+    assert.deepEqual(themeContrastIssues(spec.theme), [], id);
+    assert.ok(contrastRatio(spec.theme.ink, spec.theme.paper) >= 4.5, `${id}:ink`);
+  }
 });

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: 20
+          - os: ubuntu-latest
+            node: 22
+          - os: macos-latest
+            node: 20
+          - os: windows-latest
+            node: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Validate Unix scripts
+        if: runner.os != 'Windows'
+        run: bash -n scripts/*.sh
+      - run: npm run check
+      - name: Render smoke test on Windows
+        if: runner.os == 'Windows'
+        run: npm run render:smoke
+      - name: Render through Unix script
+        if: runner.os != 'Windows'
+        run: bash scripts/render-example.sh "$RUNNER_TEMP/unix-script-smoke" unix-script-smoke "svg,png,excalidraw"
+      - name: Pack and install npm CLI
+        if: matrix.os == 'ubuntu-latest' && matrix.node == 22
+        shell: bash
+        run: |
+          npm pack --pack-destination "$RUNNER_TEMP"
+          package_version="$(node -p "require('./package.json').version")"
+          npm install --global "$RUNNER_TEMP/paper-system-atlas-$package_version.tgz"
+          paper-atlas doctor

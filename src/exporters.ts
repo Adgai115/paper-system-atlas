@@ -7,6 +7,7 @@ import { renderSvg } from "./svg.js";
 import { renderExcalidraw } from "./excalidraw.js";
 import { paintMotionFrame } from "./motion.js";
 import { buildScene } from "./layout.js";
+import { themeContrastIssues } from "./accessibility.js";
 
 export type OutputFormat = "svg" | "png" | "jpg" | "gif" | "excalidraw";
 
@@ -102,6 +103,8 @@ export function analyzeSceneQuality(scene: Scene): { checks: QualityItem[]; warn
     return scene.nodes.filter((node) => node.id !== edge.from && node.id !== edge.to && overlaps(box, node.box)).map((node) => `${edge.from}->${edge.to}:${node.id}`);
   });
   warnings.push({ name: "edge_label_collisions", ok: labelCollisions.length === 0, detail: labelCollisions.slice(0, 24) });
+  const contrastIssues = themeContrastIssues(scene.spec.theme);
+  warnings.push({ name: "theme_color_contrast", ok: contrastIssues.length === 0, detail: contrastIssues });
   return { checks, warnings };
 }
 

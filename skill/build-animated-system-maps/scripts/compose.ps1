@@ -9,6 +9,9 @@ param(
     [string]$BaseUrl,
     [ValidateSet('responses', 'chat-completions')][string]$ApiStyle,
     [ValidateRange(1, 4)][int]$MaxAttempts = 3,
+    [ValidateRange(100, 600000)][int]$ApiTimeoutMs = 120000,
+    [ValidateRange(0, 5)][int]$ApiRetries = 2,
+    [ValidateRange(0, 30000)][int]$ApiRetryDelayMs = 500,
     [string]$SpecOut,
     [ValidateSet('paper-color', 'blueprint', 'whiteboard', 'ink-wash')][string]$Theme,
     [ValidateSet('presentation', 'article', 'wechat', 'square', 'print-a4')][string]$Canvas
@@ -21,7 +24,10 @@ $FormatValue = $Formats -join ','
 $Arguments = @(
     'compose', '--input', (Resolve-Path $InputDocument), '--outdir', $OutDir,
     '--profile', $Profile, '--basename', $BaseName, '--formats', $FormatValue,
-    '--max-attempts', $MaxAttempts
+    '--max-attempts', $MaxAttempts,
+    '--api-timeout-ms', $ApiTimeoutMs,
+    '--api-retries', $ApiRetries,
+    '--api-retry-delay-ms', $ApiRetryDelayMs
 )
 if ($Model) { $Arguments += @('--model', $Model) }
 if ($BaseUrl) { $Arguments += @('--base-url', $BaseUrl) }

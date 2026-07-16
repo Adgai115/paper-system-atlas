@@ -11,26 +11,26 @@
     "mode": "radial",
     "direction": "horizontal",
     "profile": "adaptive",
-    "hub": { "title": "Agent Loop", "description": "感知 · 决策 · 行动 · 学习", "color": "#2D8585" }
+    "hub": { "title": "Agent Loop", "description": "感知 · 决策 · 行动 · 学习", "color": "#1E7772" }
   },
   "theme": {
     "name": "paper-color",
     "paper": "#F6EEDD",
     "ink": "#243B56",
     "mutedInk": "#5F625E",
-    "palette": ["#CC654B", "#2D8585", "#3569A7", "#C18A37", "#7567A2"],
+    "palette": ["#B04A37", "#1E7772", "#3569A7", "#906314", "#705B98"],
     "titleFont": "STKaiti, KaiTi, serif",
     "bodyFont": "STKaiti, KaiTi, Microsoft YaHei, Noto Sans CJK SC, serif",
     "texture": 0.52,
     "handDrawn": 0.9
   },
   "groups": [
-    { "id": "goal-input", "title": "目标输入", "note": "目标与业务事件", "color": "#CC654B" },
-    { "id": "reason-plan", "title": "推理规划", "note": "理解并选择下一步", "color": "#2D8585" },
+    { "id": "goal-input", "title": "目标输入", "note": "目标与业务事件", "color": "#B04A37" },
+    { "id": "reason-plan", "title": "推理规划", "note": "理解并选择下一步", "color": "#1E7772" },
     { "id": "action", "title": "行动执行", "note": "调用工具改变环境", "color": "#3569A7" },
-    { "id": "observe", "title": "观察评估", "note": "读取结果判断完成度", "color": "#7567A2" },
-    { "id": "memory", "title": "记忆学习", "note": "保存经验、自我修正", "color": "#2D8585" },
-    { "id": "governance", "title": "安全交付", "note": "人工确认与最终结果", "color": "#C18A37" }
+    { "id": "observe", "title": "观察评估", "note": "读取结果判断完成度", "color": "#705B98" },
+    { "id": "memory", "title": "记忆学习", "note": "保存经验、自我修正", "color": "#1E7772" },
+    { "id": "governance", "title": "安全交付", "note": "人工确认与最终结果", "color": "#906314" }
   ],
   "nodes": [
     { "id": "user-goal", "group": "goal-input", "title": "用户目标", "description": "期望结果与完成标准", "icon": "target" },
@@ -56,14 +56,14 @@
     { "from": "result", "to": "evaluation", "kind": "result" },
     { "from": "evaluation", "to": "memory-update", "label": "经验回流", "kind": "feedback" },
     { "from": "memory-update", "to": "self-correct", "kind": "feedback" },
-    { "from": "self-correct", "to": "planning", "label": "重新规划", "kind": "feedback", "color": "#2D8585" },
+    { "from": "self-correct", "to": "planning", "label": "重新规划", "kind": "feedback", "color": "#1E7772" },
     { "from": "evaluation", "to": "human-approval", "kind": "task" },
     { "from": "evaluation", "to": "final-delivery", "kind": "result" },
     { "from": "human-approval", "to": "final-delivery", "kind": "result" },
-    { "from": "final-delivery", "to": "user-goal", "kind": "feedback", "color": "#7567A2" }
+    { "from": "final-delivery", "to": "user-goal", "kind": "feedback", "color": "#705B98" }
   ],
   "notes": [
     { "text": "Reason → Plan → Act → Observe → Evaluate", "anchor": "top-right", "color": "#3569A7" },
-    { "text": "记忆与人工确认保障安全", "anchor": "bottom-right", "color": "#C18A37" }
+    { "text": "记忆与人工确认保障安全", "anchor": "bottom-right", "color": "#906314" }
   ]
 }

@@ -22,17 +22,17 @@
     "paper": "#F6EEDD",
     "ink": "#243B56",
     "mutedInk": "#5F625E",
-    "palette": ["#CC654B", "#2D8585", "#3569A7", "#C18A37", "#7567A2"],
+    "palette": ["#B04A37", "#1E7772", "#3569A7", "#906314", "#705B98"],
     "titleFont": "STKaiti, KaiTi, serif",
     "bodyFont": "STKaiti, KaiTi, Microsoft YaHei, Noto Sans CJK SC, serif",
     "texture": 0.52,
     "handDrawn": 0.9
   },
   "groups": [
-    { "id": "input", "title": "输入", "note": "捕捉信号，理解上下文", "color": "#CC654B" },
-    { "id": "orchestration", "title": "编排", "note": "规划路径，验证结果", "color": "#2D8585" },
+    { "id": "input", "title": "输入", "note": "捕捉信号，理解上下文", "color": "#B04A37" },
+    { "id": "orchestration", "title": "编排", "note": "规划路径，验证结果", "color": "#1E7772" },
     { "id": "specialists", "title": "专家能力", "note": "并行、安全、可靠", "color": "#3569A7" },
-    { "id": "delivery", "title": "交付", "note": "以合适的形式抵达", "color": "#C18A37" }
+    { "id": "delivery", "title": "交付", "note": "以合适的形式抵达", "color": "#906314" }
   ],
   "nodes": [
     { "id": "chat", "group": "input", "title": "对话", "description": "消息、话题、提及", "icon": "chat" },
@@ -60,9 +60,9 @@
     { "from": "schedule", "to": "planning", "kind": "signal" },
     { "from": "voice", "to": "routing", "kind": "signal" },
     { "from": "documents", "to": "verification", "kind": "signal" },
-    { "from": "intent", "to": "planning", "kind": "task", "animated": false, "color": "#2D8585" },
-    { "from": "planning", "to": "routing", "kind": "task", "animated": false, "color": "#2D8585" },
-    { "from": "routing", "to": "verification", "kind": "task", "animated": false, "color": "#2D8585" },
+    { "from": "intent", "to": "planning", "kind": "task", "animated": false, "color": "#1E7772" },
+    { "from": "planning", "to": "routing", "kind": "task", "animated": false, "color": "#1E7772" },
+    { "from": "routing", "to": "verification", "kind": "task", "animated": false, "color": "#1E7772" },
     { "from": "intent", "to": "browser", "kind": "task" },
     { "from": "planning", "to": "knowledge", "kind": "task" },
     { "from": "routing", "to": "code", "kind": "task" },
@@ -71,10 +71,10 @@
     { "from": "knowledge", "to": "message", "kind": "result" },
     { "from": "code", "to": "dashboard", "kind": "result" },
     { "from": "media", "to": "archive", "kind": "result" },
-    { "from": "verification", "to": "intent", "kind": "feedback", "color": "#7567A2" }
+    { "from": "verification", "to": "intent", "kind": "feedback", "color": "#705B98" }
   ],
   "notes": [
-    { "text": "中文优先 · 内容驱动布局", "anchor": "top-right", "color": "#CC654B" },
+    { "text": "中文优先 · 内容驱动布局", "anchor": "top-right", "color": "#B04A37" },
     { "text": "可编辑 SVG 与 Excalidraw", "anchor": "bottom-right", "color": "#3569A7" }
   ],
   "decorations": {
@@ -90,10 +90,10 @@
     ],
     "support": { "title": "记忆与上下文", "description": "历史、偏好、知识图谱" },
     "callouts": [
-      { "group": "input", "text": "捕捉一切，理解意图。", "color": "#CC654B" },
-      { "group": "orchestration", "text": "规划执行路径，路由时带上下文，验证结果。", "color": "#2D8585" },
+      { "group": "input", "text": "捕捉一切，理解意图。", "color": "#B04A37" },
+      { "group": "orchestration", "text": "规划执行路径，路由时带上下文，验证结果。", "color": "#1E7772" },
       { "group": "specialists", "text": "专家各司其职，并行、安全、可靠。", "color": "#3569A7" },
-      { "group": "delivery", "text": "以合适的形式，交付给合适的人，在正确的时间。", "color": "#CC654B" }
+      { "group": "delivery", "text": "以合适的形式，交付给合适的人，在正确的时间。", "color": "#B04A37" }
     ],
     "compass": true,
     "landscape": true

@@ -188,12 +188,18 @@ async function composeCommand(args: Args): Promise<void> {
   const baseUrl = typeof args["base-url"] === "string" ? args["base-url"] : process.env.PAPER_ATLAS_BASE_URL ?? process.env.OPENAI_BASE_URL;
   const maxAttempts = Number(args["max-attempts"] ?? 3);
   if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 4) throw new Error("--max-attempts 必须是 1-4 的整数");
+  const apiTimeoutMs = Number(args["api-timeout-ms"] ?? process.env.PAPER_ATLAS_API_TIMEOUT_MS ?? 120_000);
+  if (!Number.isInteger(apiTimeoutMs) || apiTimeoutMs < 100 || apiTimeoutMs > 600_000) throw new Error("--api-timeout-ms 必须是 100-600000 的整数");
+  const apiRetries = Number(args["api-retries"] ?? process.env.PAPER_ATLAS_API_RETRIES ?? 2);
+  if (!Number.isInteger(apiRetries) || apiRetries < 0 || apiRetries > 5) throw new Error("--api-retries 必须是 0-5 的整数");
+  const apiRetryDelayMs = Number(args["api-retry-delay-ms"] ?? process.env.PAPER_ATLAS_API_RETRY_DELAY_MS ?? 500);
+  if (!Number.isInteger(apiRetryDelayMs) || apiRetryDelayMs < 0 || apiRetryDelayMs > 30_000) throw new Error("--api-retry-delay-ms 必须是 0-30000 的整数");
 
   const composed = await composeDocument({
     document,
     profile,
     maxAttempts,
-    client: createOpenAICompatibleClient({ apiKey, baseUrl, model, apiStyle }),
+    client: createOpenAICompatibleClient({ apiKey, baseUrl, model, apiStyle, timeoutMs: apiTimeoutMs, maxRetries: apiRetries, retryDelayMs: apiRetryDelayMs }),
   });
   applySpecOverrides(composed.spec, args);
   const outdir = path.resolve(required(args, "outdir"));
@@ -240,7 +246,7 @@ async function doctorCommand(): Promise<void> {
 }
 
 function usage(): void {
-  console.log(`纸上系统图谱 CLI\n\n命令:\n  plan     为文档或规格输出机器可读的布局、主题与格式建议\n  batch    批量渲染规格并输出统一 manifest（默认自动规划且逐项校验）\n  compose  将 Markdown/TXT 文档编排为规格并生成全部图像\n  render   根据规格生成 SVG/PNG/JPG/GIF/Excalidraw，可用 --layout 覆盖布局\n  preview  一次生成多种布局并输出对比拼图\n  presets  查看主题与画布预设\n  validate 校验规格\n  doctor   检查 Windows 与运行环境\n\nAgent 接口约定:\n  --input - / --spec - 从标准输入读取；成功写 JSON 到 stdout，失败写 JSON 到 stderr\n  退出码 1=执行或校验失败，2=参数或输入无效，3=模型配置失败，4=文件系统失败\n\n通用视觉参数:\n  --theme  paper-color、blueprint、whiteboard 或 ink-wash\n  --canvas presentation、article、wechat、square 或 print-a4\n\n模型环境变量:\n  PAPER_ATLAS_API_KEY   模型密钥（也支持 OPENAI_API_KEY）\n  PAPER_ATLAS_MODEL     模型名称（也支持 OPENAI_MODEL）\n  PAPER_ATLAS_BASE_URL  API 根地址，默认 https://api.openai.com/v1\n  PAPER_ATLAS_API_STYLE responses 或 chat-completions\n\n示例:\n  paper-atlas plan --input article.md\n  Get-Content -Raw article.md | paper-atlas plan --input -\n  paper-atlas plan --spec examples/intelligent-collaboration.json\n  paper-atlas batch --input examples --outdir outputs/batch --layout auto --formats svg,png,excalidraw\n  paper-atlas compose --input article.md --profile atlas-showcase --outdir outputs --basename article-map --formats svg,png,jpg,gif,excalidraw\n  paper-atlas render --spec examples/intelligent-collaboration.json --outdir outputs --basename demo --layout radial --theme blueprint --canvas presentation --formats svg,png,excalidraw --verify\n  paper-atlas preview --spec examples/intelligent-collaboration.json --outdir outputs/preview --basename demo --verify`);
+  console.log(`纸上系统图谱 CLI\n\n命令:\n  plan     为文档或规格输出机器可读的布局、主题与格式建议\n  batch    批量渲染规格并输出统一 manifest（默认自动规划且逐项校验）\n  compose  将 Markdown/TXT 文档编排为规格并生成全部图像\n  render   根据规格生成 SVG/PNG/JPG/GIF/Excalidraw，可用 --layout 覆盖布局\n  preview  一次生成多种布局并输出对比拼图\n  presets  查看主题与画布预设\n  validate 校验规格\n  doctor   检查运行环境\n\nAgent 接口约定:\n  --input - / --spec - 从标准输入读取；成功写 JSON 到 stdout，失败写 JSON 到 stderr\n  退出码 1=执行或校验失败，2=参数或输入无效，3=模型配置失败，4=文件系统失败\n\n通用视觉参数:\n  --theme  paper-color、blueprint、whiteboard 或 ink-wash\n  --canvas presentation、article、wechat、square 或 print-a4\n\n模型环境变量:\n  PAPER_ATLAS_API_KEY          模型密钥（也支持 OPENAI_API_KEY）\n  PAPER_ATLAS_MODEL           模型名称（也支持 OPENAI_MODEL）\n  PAPER_ATLAS_BASE_URL        API 根地址，默认 https://api.openai.com/v1\n  PAPER_ATLAS_API_STYLE       responses 或 chat-completions\n  PAPER_ATLAS_API_TIMEOUT_MS  单次 HTTP 请求超时，默认 120000\n  PAPER_ATLAS_API_RETRIES     超时、限流和 5xx 重试次数，默认 2\n  PAPER_ATLAS_API_RETRY_DELAY_MS  指数退避初始间隔，默认 500\n\n示例:\n  paper-atlas plan --input article.md\n  Get-Content -Raw article.md | paper-atlas plan --input -\n  paper-atlas plan --spec examples/intelligent-collaboration.json\n  paper-atlas batch --input examples --outdir outputs/batch --layout auto --formats svg,png,excalidraw\n  paper-atlas compose --input article.md --profile atlas-showcase --outdir outputs --basename article-map --formats svg,png,jpg,gif,excalidraw --api-timeout-ms 120000 --api-retries 2\n  paper-atlas render --spec examples/intelligent-collaboration.json --outdir outputs --basename demo --layout radial --theme blueprint --canvas presentation --formats svg,png,excalidraw --verify\n  paper-atlas preview --spec examples/intelligent-collaboration.json --outdir outputs/preview --basename demo --verify`);
 }
 
 async function main(): Promise<void> {

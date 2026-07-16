@@ -1,11 +1,29 @@
 {
   "name": "paper-system-atlas",
   "version": "0.3.0",
-  "private": true,
   "type": "module",
   "description": "Agent-first Chinese paper-style system-map planning and rendering toolkit",
+  "keywords": [
+    "system-map",
+    "diagram",
+    "svg",
+    "excalidraw",
+    "agent"
+  ],
+  "homepage": "https://github.com/Adgai115/paper-system-atlas#readme",
+  "bugs": {
+    "url": "https://github.com/Adgai115/paper-system-atlas/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Adgai115/paper-system-atlas.git"
+  },
   "bin": {
     "paper-atlas": "dist/src/cli.js"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "files": [
     "dist/src/*.js",
@@ -19,11 +37,14 @@
     "build": "npm run clean:build && tsc -p tsconfig.json",
     "dev": "tsx src/cli.ts",
     "render:example": "tsx src/cli.ts render --spec examples/intelligent-collaboration.json --outdir outputs --basename intelligent-collaboration --formats svg,png,jpg,gif,excalidraw --verify",
+    "render:smoke": "node dist/src/cli.js render --spec examples/ai-loop-adaptive.json --outdir outputs/ci-smoke --basename ci-smoke --formats svg,png,excalidraw --verify",
     "render:visuals": "powershell -ExecutionPolicy Bypass -File scripts/render-visual-samples.ps1",
     "test": "node --import tsx --test tests/*.test.ts",
     "check": "npm run build && npm test",
-    "pack:check": "npm run check && npm pack --dry-run",
-    "package:windows": "powershell -ExecutionPolicy Bypass -File scripts/build-distribution.ps1"
+    "prepack": "npm run build",
+    "pack:check": "npm test && npm pack --dry-run",
+    "package:windows": "powershell -ExecutionPolicy Bypass -File scripts/build-distribution.ps1",
+    "package:unix": "bash scripts/build-distribution.sh"
   },
   "dependencies": {
     "gifenc": "^1.0.3",

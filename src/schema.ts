@@ -15,7 +15,7 @@ const themeSchema = z.object({
   paper: color.default("#F6EEDD"),
   ink: color.default("#243B56"),
   mutedInk: color.default("#5F625E"),
-  palette: z.array(color).min(2).max(12).default(["#CC654B", "#2D8585", "#3569A7", "#C18A37", "#7567A2"]),
+  palette: z.array(color).min(2).max(12).default(["#B04A37", "#1E7772", "#3569A7", "#906314", "#705B98"]),
   titleFont: z.string().default("STKaiti, KaiTi, serif"),
   bodyFont: z.string().default("STKaiti, KaiTi, Microsoft YaHei, Noto Sans CJK SC, serif"),
   texture: z.number().min(0).max(1).default(0.52),

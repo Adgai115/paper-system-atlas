@@ -6,7 +6,7 @@ export const themePresets = {
     description: "默认暖纸、水彩洗色和深蓝墨线",
     theme: {
       name: "paper-color", paper: "#F6EEDD", ink: "#243B56", mutedInk: "#5F625E",
-      palette: ["#CC654B", "#2D8585", "#3569A7", "#C18A37", "#7567A2"],
+      palette: ["#B04A37", "#1E7772", "#3569A7", "#906314", "#705B98"],
       titleFont: "STKaiti, KaiTi, serif", bodyFont: "STKaiti, KaiTi, Microsoft YaHei, Noto Sans CJK SC, serif",
       texture: 0.52, handDrawn: 0.9,
     },
@@ -26,7 +26,7 @@ export const themePresets = {
     description: "清爽白底、高对比墨色和轻量手写感",
     theme: {
       name: "whiteboard", paper: "#F7F8F4", ink: "#26333B", mutedInk: "#667078",
-      palette: ["#C85F4A", "#23817C", "#3D6EA8", "#B9822E", "#75659B"],
+      palette: ["#B04A37", "#1E7772", "#3D6EA8", "#906314", "#75659B"],
       titleFont: "Microsoft YaHei, Noto Sans CJK SC, sans-serif", bodyFont: "Microsoft YaHei, Noto Sans CJK SC, sans-serif",
       texture: 0.12, handDrawn: 0.64,
     },
@@ -36,7 +36,7 @@ export const themePresets = {
     description: "宣纸、中性墨色和单点朱砂强调",
     theme: {
       name: "ink-wash", paper: "#F3EFE4", ink: "#202A2E", mutedInk: "#626866",
-      palette: ["#A64B3C", "#566F6A", "#405A70", "#8B7451", "#6D6572"],
+      palette: ["#A64B3C", "#566F6A", "#405A70", "#755C35", "#6D6572"],
       titleFont: "STKaiti, KaiTi, serif", bodyFont: "STKaiti, KaiTi, Microsoft YaHei, Noto Sans CJK SC, serif",
       texture: 0.68, handDrawn: 0.94,
     },

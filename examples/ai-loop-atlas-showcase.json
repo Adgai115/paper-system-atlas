@@ -13,17 +13,17 @@
     "paper": "#F6EEDD",
     "ink": "#243B56",
     "mutedInk": "#5F625E",
-    "palette": ["#CC654B", "#2D8585", "#3569A7", "#C18A37", "#7567A2"],
+    "palette": ["#B04A37", "#1E7772", "#3569A7", "#906314", "#705B98"],
     "titleFont": "STKaiti, KaiTi, serif",
     "bodyFont": "STKaiti, KaiTi, Microsoft YaHei, Noto Sans CJK SC, serif",
     "texture": 0.52,
     "handDrawn": 0.9
   },
   "groups": [
-    { "id": "trigger", "title": "目标触发", "note": "明确目标、事件与边界", "color": "#CC654B" },
-    { "id": "agent-loop", "title": "核心循环", "note": "推理、计划、行动、观察", "color": "#2D8585" },
+    { "id": "trigger", "title": "目标触发", "note": "明确目标、事件与边界", "color": "#B04A37" },
+    { "id": "agent-loop", "title": "核心循环", "note": "推理、计划、行动、观察", "color": "#1E7772" },
     { "id": "loop-types", "title": "闭环增强", "note": "学习、记忆、自动化与人工", "color": "#3569A7" },
-    { "id": "outcome", "title": "持续优化", "note": "安全交付并逼近目标", "color": "#C18A37" }
+    { "id": "outcome", "title": "持续优化", "note": "安全交付并逼近目标", "color": "#906314" }
   ],
   "nodes": [
     { "id": "goal", "group": "trigger", "title": "用户目标", "description": "定义期望结果与完成标准", "icon": "target" },
@@ -51,9 +51,9 @@
     { "from": "event", "to": "plan", "kind": "signal" },
     { "from": "context", "to": "act", "kind": "signal" },
     { "from": "boundary", "to": "evaluate", "kind": "signal" },
-    { "from": "reason", "to": "plan", "kind": "task", "animated": false, "color": "#2D8585" },
-    { "from": "plan", "to": "act", "kind": "task", "animated": false, "color": "#2D8585" },
-    { "from": "act", "to": "evaluate", "kind": "task", "animated": false, "color": "#2D8585" },
+    { "from": "reason", "to": "plan", "kind": "task", "animated": false, "color": "#1E7772" },
+    { "from": "plan", "to": "act", "kind": "task", "animated": false, "color": "#1E7772" },
+    { "from": "act", "to": "evaluate", "kind": "task", "animated": false, "color": "#1E7772" },
     { "from": "reason", "to": "self-improve", "kind": "task" },
     { "from": "plan", "to": "memory-loop", "kind": "task" },
     { "from": "act", "to": "automation-loop", "kind": "task" },
@@ -62,10 +62,10 @@
     { "from": "memory-loop", "to": "deliver", "kind": "result" },
     { "from": "automation-loop", "to": "track", "kind": "result" },
     { "from": "human-loop", "to": "optimize", "kind": "result" },
-    { "from": "evaluate", "to": "reason", "kind": "feedback", "color": "#7567A2" }
+    { "from": "evaluate", "to": "reason", "kind": "feedback", "color": "#705B98" }
   ],
   "notes": [
-    { "text": "目标驱动 · 反馈闭环 · 持续学习", "anchor": "top-right", "color": "#CC654B" },
+    { "text": "目标驱动 · 反馈闭环 · 持续学习", "anchor": "top-right", "color": "#B04A37" },
     { "text": "Reason → Act → Observe → Evaluate", "anchor": "bottom-right", "color": "#3569A7" }
   ]
 }

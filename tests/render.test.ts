@@ -118,7 +118,7 @@ test("默认分层主题保留非对称构图、汇聚枢纽和手绘图例", as
   const svg = renderSvg(scene);
   assert.match(svg, /id="atlas-junctions"/);
   assert.match(svg, /id="showcase-legend"/);
-  assert.match(svg, /#CC654B|#cc654b/);
+  assert.match(svg, /#B04A37|#b04a37/);
   const rasterSvg = renderSvg(scene, { rasterOptimized: true });
   assert.match(rasterSvg, /numOctaves="1"/);
   assert.doesNotMatch(rasterSvg, /feDisplacementMap/);
@@ -144,6 +144,11 @@ test("SVG 与 Excalidraw 保留中文内容和唯一元素 ID", async () => {
   const scene = buildScene(await fixture());
   const svg = renderSvg(scene, { animatedSvg: true });
   assert.match(svg, /系统图谱/);
+  assert.match(svg, /role="img"/);
+  assert.match(svg, /<title id="atlas-accessible-title">/);
+  assert.match(svg, /<desc id="atlas-accessible-description">/);
+  assert.match(svg, /stroke-dasharray="10 5"/);
+  assert.match(svg, /stroke-dasharray="14 4 3 4"/);
   assert.match(svg, /animateMotion/);
   assert.match(svg, /id="atlas-node-pulses"/);
   const animatedEdges = scene.edges.filter((edge) => edge.animated).length;

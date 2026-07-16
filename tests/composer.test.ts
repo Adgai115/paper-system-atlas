@@ -62,6 +62,59 @@ test("OpenAI 兼容适配器支持 Chat Completions 严格结构化输出", asyn
   assert.equal(format.json_schema?.strict, true);
 });
 
+test("模型接口对限流和 5xx 使用指数退避后重试", async () => {
+  let calls = 0;
+  const delays: number[] = [];
+  const client = createOpenAICompatibleClient({
+    apiKey: "test-key", model: "mock-model", maxRetries: 2, retryDelayMs: 25,
+    sleepImpl: async (delayMs) => { delays.push(delayMs); },
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls === 1) return new Response("busy", { status: 503 });
+      if (calls === 2) return new Response("limited", { status: 429 });
+      return new Response(JSON.stringify({ output_text: JSON.stringify(showcaseSemantic()) }), { status: 200 });
+    },
+  });
+  const output = await client.generate({ instructions: "只输出 JSON", input: "测试", jsonSchema: semanticJsonSchema("atlas-showcase") });
+  assert.equal(JSON.parse(output).meta.title, "AI 循环图谱");
+  assert.equal(calls, 3);
+  assert.deepEqual(delays, [25, 50]);
+});
+
+test("模型接口超时会按配置重试并给出稳定错误", async () => {
+  let calls = 0;
+  const client = createOpenAICompatibleClient({
+    apiKey: "test-key", model: "mock-model", timeoutMs: 20, maxRetries: 1, retryDelayMs: 0,
+    fetchImpl: async (_input, init) => {
+      calls += 1;
+      return await new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (!signal) return reject(new Error("缺少超时信号"));
+        if (signal.aborted) return reject(signal.reason);
+        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+      });
+    },
+  });
+  await assert.rejects(
+    client.generate({ instructions: "只输出 JSON", input: "测试", jsonSchema: semanticJsonSchema("atlas-showcase") }),
+    /模型接口请求失败（2 次尝试）：模型接口请求超时/,
+  );
+  assert.equal(calls, 2);
+});
+
+test("模型接口不会重试不可恢复的 4xx", async () => {
+  let calls = 0;
+  const client = createOpenAICompatibleClient({
+    apiKey: "test-key", model: "mock-model", maxRetries: 3, retryDelayMs: 0,
+    fetchImpl: async () => { calls += 1; return new Response("bad request", { status: 400 }); },
+  });
+  await assert.rejects(
+    client.generate({ instructions: "只输出 JSON", input: "测试", jsonSchema: semanticJsonSchema("atlas-showcase") }),
+    /HTTP 400/,
+  );
+  assert.equal(calls, 1);
+});
+
 test("compose CLI 从中文文档调用模型、自动修复规格并真实渲染", async () => {
   let calls = 0;
   let sawDocument = false;

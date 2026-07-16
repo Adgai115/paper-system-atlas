@@ -91,7 +91,8 @@ test("模型接口超时会按配置重试并给出稳定错误", async () => {
         const signal = init?.signal;
         if (!signal) return reject(new Error("缺少超时信号"));
         if (signal.aborted) return reject(signal.reason);
-        signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+        const guard = setTimeout(() => reject(new Error("模拟请求未被超时信号中止")), 1000);
+        signal.addEventListener("abort", () => { clearTimeout(guard); reject(signal.reason); }, { once: true });
       });
     },
   });

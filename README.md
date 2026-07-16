@@ -1,6 +1,7 @@
 # Paper System Atlas
 
 [![CI](https://github.com/Adgai115/paper-system-atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/Adgai115/paper-system-atlas/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/paper-system-atlas.svg)](https://www.npmjs.com/package/paper-system-atlas)
 
 一个面向 Agent 的中文优先、纸张彩色手绘风格语义化系统地图工具、Skill 与可部署 CLI。
 

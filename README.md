@@ -7,6 +7,10 @@
 
 它从内容规格自动计算布局，以 SVG 作为主要可编辑格式，同时输出 PNG、JPG、GIF 和 Excalidraw。项目使用独立协议、场景模型、布局算法和渲染实现。
 
+## 效果预览
+
+![Paper System Atlas 生成的 AI 循环图谱](design/showcase-ai-loop.png)
+
 ## 快速开始
 
 Windows：

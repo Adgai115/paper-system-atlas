@@ -19,7 +19,7 @@ npm install -g ./dist-package/paper-system-atlas-0.3.0.tgz
 paper-atlas doctor
 ```
 
-命令同时生成 `build-animated-system-maps-skill.zip`。把它解压到 Codex skills 目录后，Skill 会优先使用源码仓库 CLI；脱离源码仓库时自动调用全局 `paper-atlas`。仓库保持私有且许可证仍为 `UNLICENSED`，安装包只用于授权环境内部部署。
+命令同时生成 `build-animated-system-maps-skill.zip`。把它解压到 Codex skills 目录后，Skill 会优先使用源码仓库 CLI；脱离源码仓库时自动调用全局 `paper-atlas`。
 
 生成分层、泳道和径向三种中文视觉回归样例：
 
@@ -169,4 +169,10 @@ AI Loop 测试示例同时展示两种配置：
 
 ## 当前状态
 
-当前为原创 v0.3 开发版本，许可证与最终公开项目名称尚未确定。
+当前为原创 v0.3 开发版本。
+
+## 许可证
+
+Copyright (C) 2026 Adgai115。
+
+本项目采用 [GNU General Public License v3.0 only](LICENSE) 开源。你可以在 GPL-3.0 的条款下使用、修改和分发本项目；分发修改版本时必须继续提供相应源代码并保留同一许可证。

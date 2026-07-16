@@ -7,7 +7,12 @@
     "language": "zh-CN"
   },
   "canvas": { "width": 1600, "height": 1000, "fps": 8, "frames": 16 },
-  "layout": { "mode": "radial", "direction": "horizontal", "profile": "adaptive" },
+  "layout": {
+    "mode": "radial",
+    "direction": "horizontal",
+    "profile": "adaptive",
+    "hub": { "title": "Agent Loop", "description": "感知 · 决策 · 行动 · 学习", "color": "#2D8585" }
+  },
   "theme": {
     "name": "paper-color",
     "paper": "#F6EEDD",
@@ -42,16 +47,16 @@
     { "id": "final-delivery", "group": "governance", "title": "结果交付", "description": "报告、回复或自动化动作", "icon": "report" }
   ],
   "edges": [
-    { "from": "user-goal", "to": "reasoning", "kind": "signal" },
+    { "from": "user-goal", "to": "reasoning", "label": "目标与约束", "kind": "signal" },
     { "from": "business-event", "to": "reasoning", "kind": "signal" },
     { "from": "reasoning", "to": "planning", "kind": "task" },
     { "from": "planning", "to": "tool-call", "kind": "task" },
     { "from": "tool-call", "to": "environment", "kind": "task" },
     { "from": "environment", "to": "result", "kind": "result" },
     { "from": "result", "to": "evaluation", "kind": "result" },
-    { "from": "evaluation", "to": "memory-update", "kind": "feedback" },
+    { "from": "evaluation", "to": "memory-update", "label": "经验回流", "kind": "feedback" },
     { "from": "memory-update", "to": "self-correct", "kind": "feedback" },
-    { "from": "self-correct", "to": "planning", "kind": "feedback", "color": "#2D8585" },
+    { "from": "self-correct", "to": "planning", "label": "重新规划", "kind": "feedback", "color": "#2D8585" },
     { "from": "evaluation", "to": "human-approval", "kind": "task" },
     { "from": "evaluation", "to": "final-delivery", "kind": "result" },
     { "from": "human-approval", "to": "final-delivery", "kind": "result" },

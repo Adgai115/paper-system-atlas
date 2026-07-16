@@ -64,12 +64,16 @@ function radialGroups(spec: AtlasSpec): LayoutGroup[] {
   const cx = spec.canvas.width / 2;
   const cy = spec.canvas.height / 2 + 42;
   const count = spec.groups.length;
-  const boxWidth = Math.min(340, Math.max(210, spec.canvas.width * (count > 6 ? 0.17 : count > 4 ? 0.2 : 0.22)));
-  const boxHeight = Math.min(238, Math.max(148, (spec.canvas.height - 226) / Math.max(2.8, Math.ceil(count / 2))));
+  const hubReserve = Math.min(290, spec.canvas.width * 0.19);
+  const sideCapacity = (spec.canvas.width - hubReserve) / 2 - 72;
+  const targetWidth = spec.canvas.width * (count <= 4 ? 0.27 : count > 6 ? 0.17 : 0.2);
+  const boxWidth = Math.min(count <= 4 ? 440 : 340, Math.max(210, Math.min(targetWidth, sideCapacity)));
+  const targetHeight = count <= 4 ? (spec.canvas.height - 240) / 2.55 : (spec.canvas.height - 226) / Math.max(2.8, Math.ceil(count / 2));
+  const boxHeight = Math.min(count <= 4 ? 280 : 258, Math.max(148, targetHeight));
   const rx = Math.max(boxWidth * 0.92, spec.canvas.width / 2 - boxWidth / 2 - 66);
   const ry = Math.max(boxHeight * 0.7, spec.canvas.height / 2 - boxHeight / 2 - 104);
   const result = spec.groups.map((group, index) => {
-    const angle = -Math.PI * 0.75 + (Math.PI * 2 * index) / count;
+    const angle = -Math.PI * 0.5 + (Math.PI * 2 * index) / count;
     const x = Math.max(32, Math.min(spec.canvas.width - boxWidth - 32, cx + Math.cos(angle) * rx - boxWidth / 2));
     const y = Math.max(150, Math.min(spec.canvas.height - boxHeight - 42, cy + Math.sin(angle) * ry - boxHeight / 2));
     return { ...group, index, color: groupColor(spec, group, index), box: { x, y, width: boxWidth, height: boxHeight } };
@@ -361,6 +365,17 @@ export function buildScene(spec: AtlasSpec): Scene {
   const radialMode = spec.layout.mode === "radial";
   const showcaseMode = spec.layout.profile === "atlas-showcase" && spec.layout.mode === "layered";
   const groups = radialMode ? radialGroups(spec) : laneMode ? laneGroups(spec) : layeredGroups(spec);
+  const hub = radialMode ? {
+    title: spec.layout.hub?.title ?? spec.meta.title,
+    description: spec.layout.hub?.description ?? spec.meta.subtitle,
+    color: spec.layout.hub?.color ?? spec.theme.palette[1] ?? spec.theme.ink,
+    box: {
+      x: spec.canvas.width / 2 - Math.min(290, spec.canvas.width * 0.19) / 2,
+      y: spec.canvas.height / 2 + 42 - 56,
+      width: Math.min(290, spec.canvas.width * 0.19),
+      height: 112,
+    },
+  } : undefined;
   const nodes = groups.flatMap((group) => layoutNodesInGroup(group, spec.nodes.filter((node) => node.group === group.id), laneMode, radialMode, showcaseMode));
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
   const groupMap = new Map(groups.map((group) => [group.id, group]));
@@ -385,9 +400,15 @@ export function buildScene(spec: AtlasSpec): Scene {
     const authoredFlow = showcaseMode && edge.kind !== "feedback"
       ? atlasFlowPath(from.box, to.box, fromGroup, toGroup, `${edge.from}-${edge.to}`, canvas)
       : undefined;
-    const path = authoredFlow ?? connectionPath(from.box, to.box, `${edge.from}-${edge.to}`, obstacles, routed, canvas, edge.kind === "feedback");
+    const radialFlow = radialMode && hub && fromGroup.id !== toGroup.id
+      ? compactPath([
+          ...connectionPath(from.box, hub.box, `${edge.from}-${edge.to}-hub-in`, obstacles, routed, canvas, false),
+          ...connectionPath(hub.box, to.box, `${edge.from}-${edge.to}-hub-out`, obstacles, routed, canvas, edge.kind === "feedback").slice(1),
+        ])
+      : undefined;
+    const path = authoredFlow ?? radialFlow ?? connectionPath(from.box, to.box, `${edge.from}-${edge.to}`, obstacles, routed, canvas, edge.kind === "feedback");
     routed.push(path);
     return { ...edge, color: edge.color ?? fallback, path };
   });
-  return { spec, groups, nodes, edges };
+  return { spec, groups, nodes, edges, hub };
 }

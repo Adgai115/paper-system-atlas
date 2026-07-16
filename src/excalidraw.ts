@@ -1,4 +1,5 @@
 import type { Box, Scene } from "./types.js";
+import { pointAlongPath } from "./motion.js";
 
 type Element = Record<string, unknown>;
 
@@ -92,6 +93,22 @@ export function renderExcalidraw(scene: Scene): string {
     arrow.startArrowhead = null;
     arrow.endArrowhead = "arrow";
     elements.push(arrow);
+    if (edge.label?.trim()) {
+      const label = edge.label.trim();
+      const [x, y] = pointAlongPath(edge, 0.52);
+      const width = Math.max(82, Math.min(190, label.length * 14 + 24));
+      const height = label.length > 12 ? 48 : 34;
+      const labelBox = { x: x - width / 2, y: y - height / 2, width, height };
+      elements.push(elementBase(`edge-${edge.from}-${edge.to}-label-bg`, "rectangle", labelBox, edge.color, spec.theme.paper, 0.6));
+      elements.push(textElement(`edge-${edge.from}-${edge.to}-label`, label, labelBox.x + 8, labelBox.y + 7, labelBox.width - 16, labelBox.height - 10, 12, spec.theme.ink, "center"));
+    }
+  }
+
+  if (scene.hub) {
+    const hub = scene.hub;
+    elements.push(elementBase("atlas-radial-hub", "rectangle", hub.box, hub.color, spec.theme.paper, 1));
+    elements.push(textElement("atlas-radial-hub-title", hub.title, hub.box.x + 18, hub.box.y + 22, hub.box.width - 36, 34, 23, spec.theme.ink, "center"));
+    if (hub.description) elements.push(textElement("atlas-radial-hub-description", hub.description, hub.box.x + 18, hub.box.y + 66, hub.box.width - 36, 30, 12, spec.theme.mutedInk, "center"));
   }
 
   for (const node of scene.nodes) {
@@ -105,33 +122,38 @@ export function renderExcalidraw(scene: Scene): string {
   if (spec.layout.profile === "atlas-showcase" && spec.layout.mode === "layered") {
     const sx = spec.canvas.width / 1674;
     const sy = spec.canvas.height / 941;
+    const decorations = spec.decorations;
     const scaled = (x: number, y: number, width: number, height: number): Box => ({ x: x * sx, y: y * sy, width: width * sx, height: height * sy });
+    const support = decorations?.support ?? { title: "系统支撑", description: spec.meta.description ?? spec.meta.subtitle ?? "共享能力与运行上下文" };
     elements.push(elementBase("showcase-memory-body", "rectangle", scaled(568, 768, 164, 82), spec.theme.ink, spec.theme.paper, 1));
     elements.push(elementBase("showcase-memory-top", "ellipse", scaled(568, 751, 164, 34), spec.theme.palette[1], spec.theme.paper, 1));
-    elements.push(textElement("showcase-memory-title", "记忆与上下文", 584 * sx, 790 * sy, 132 * sx, 26 * sy, 18, spec.theme.ink, "center"));
-    elements.push(textElement("showcase-memory-copy", "历史、偏好、知识图谱", 582 * sx, 820 * sy, 136 * sx, 38 * sy, 12, spec.theme.mutedInk, "center"));
+    elements.push(textElement("showcase-memory-title", support.title, 584 * sx, 790 * sy, 132 * sx, 26 * sy, 18, spec.theme.ink, "center"));
+    if (support.description) elements.push(textElement("showcase-memory-copy", support.description, 582 * sx, 820 * sy, 136 * sx, 38 * sy, 12, spec.theme.mutedInk, "center"));
     for (const [index, x] of [606, 650, 694].entries()) elements.push(lineElement(`showcase-memory-link-${index}`, [[x * sx, 716 * sy], [x * sx, 755 * sy]], spec.theme.palette[1], 2));
 
     elements.push(elementBase("showcase-principles", "rectangle", scaled(1434, 44, 190, 164), spec.theme.ink, spec.theme.paper, 1));
     elements.push(textElement("showcase-principles-title", "设计原则", 1452 * sx, 61 * sy, 150 * sx, 25 * sy, 17, spec.theme.ink));
-    elements.push(textElement("showcase-principles-copy", "· 以意图为先\n· 上下文丰富\n· 专家驱动\n· 可验证与安全\n· 人性回环中", 1452 * sx, 91 * sy, 150 * sx, 108 * sy, 13, spec.theme.palette[0]));
+    const principles = decorations?.principles ?? (spec.notes ?? []).flatMap((note) => note.text.split(/\s*·\s*/));
+    elements.push(textElement("showcase-principles-copy", principles.slice(0, 5).map((item) => `· ${item}`).join("\n"), 1452 * sx, 91 * sy, 150 * sx, 108 * sy, 13, spec.theme.palette[0]));
 
     elements.push(elementBase("showcase-legend", "rectangle", scaled(34, 700, 205, 190), spec.theme.ink, spec.theme.paper, 1));
     elements.push(textElement("showcase-legend-title", "图例", 65 * sx, 712 * sy, 80 * sx, 25 * sy, 17, spec.theme.ink));
-    elements.push(textElement("showcase-legend-copy", "用户信号流\n编排流程\n专家任务流\n结果输出流\n上下文／反馈\n端口／接口\n存储／记忆", 108 * sx, 742 * sy, 112 * sx, 140 * sy, 12, spec.theme.ink));
-    const callouts: Array<[string, string, number, number, string]> = [
-      ["input", "捕捉一切，\n理解意图。", 365, 230, spec.theme.palette[0]],
-      ["orchestration", "规划执行路径，\n路由时带上下文，\n验证结果。", 390, 710, spec.theme.palette[1]],
-      ["specialists", "专家各司其职，\n并行、安全、可靠。", 898, 748, spec.theme.palette[2]],
-      ["delivery", "以合适的形式，\n交付给合适的人，\n在正确的时间。", 1244, 674, spec.theme.palette[0]],
-      ["adaptive", "自适应系统，\n持续学习，\n不断优化结果。", 1352, 812, spec.theme.ink],
-    ];
-    for (const [id, text, x, y, color] of callouts) elements.push(textElement(`showcase-callout-${id}`, text, x * sx, y * sy, 180 * sx, 75 * sy, 15, color));
-    elements.push(elementBase("showcase-compass", "ellipse", scaled(1537, 758, 86, 86), spec.theme.ink, "transparent", 1));
-    elements.push(textElement("showcase-compass-n", "N", 1570 * sx, 740 * sy, 20, 20, 13, spec.theme.ink, "center"));
-    elements.push(textElement("showcase-compass-s", "S", 1570 * sx, 850 * sy, 20, 20, 13, spec.theme.ink, "center"));
-    elements.push(textElement("showcase-compass-we", "W       E", 1512 * sx, 793 * sy, 140 * sx, 20, 13, spec.theme.ink, "center"));
-    elements.push(lineElement("showcase-landscape", [[1135 * sx, 853 * sy], [1193 * sx, 814 * sy], [1247 * sx, 844 * sy], [1298 * sx, 814 * sy], [1349 * sx, 864 * sy]], spec.theme.ink, 1));
+    const defaultLegend = ["信号流", "任务流", "结果流", "反馈回路", "端口／接口", support.title];
+    elements.push(textElement("showcase-legend-copy", (decorations?.legend?.map((entry) => entry.label) ?? defaultLegend).join("\n"), 108 * sx, 742 * sy, 112 * sx, 140 * sy, 12, spec.theme.ink));
+    const calloutPositions = [[365, 230], [390, 710], [898, 748], [1244, 674]] as const;
+    const authoredCallouts = decorations?.callouts ?? scene.groups.filter((group) => group.note).map((group) => ({ group: group.id, text: group.note!, color: group.color }));
+    for (const [index, item] of authoredCallouts.slice(0, 4).entries()) {
+      const groupIndex = Math.max(0, scene.groups.findIndex((group) => group.id === item.group));
+      const [x, y] = calloutPositions[groupIndex] ?? calloutPositions[index];
+      elements.push(textElement(`showcase-callout-${item.group}-${index}`, item.text, x * sx, y * sy, 180 * sx, 75 * sy, 15, item.color ?? scene.groups[groupIndex]?.color ?? spec.theme.ink));
+    }
+    if (decorations?.compass !== false) {
+      elements.push(elementBase("showcase-compass", "ellipse", scaled(1537, 758, 86, 86), spec.theme.ink, "transparent", 1));
+      elements.push(textElement("showcase-compass-n", "N", 1570 * sx, 740 * sy, 20, 20, 13, spec.theme.ink, "center"));
+      elements.push(textElement("showcase-compass-s", "S", 1570 * sx, 850 * sy, 20, 20, 13, spec.theme.ink, "center"));
+      elements.push(textElement("showcase-compass-we", "W       E", 1512 * sx, 793 * sy, 140 * sx, 20, 13, spec.theme.ink, "center"));
+    }
+    if (decorations?.landscape !== false) elements.push(lineElement("showcase-landscape", [[1135 * sx, 853 * sy], [1193 * sx, 814 * sy], [1247 * sx, 844 * sy], [1298 * sx, 814 * sy], [1349 * sx, 864 * sy]], spec.theme.ink, 1));
   }
 
   elements.forEach((element, index) => {

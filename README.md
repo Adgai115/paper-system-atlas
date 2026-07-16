@@ -15,7 +15,7 @@
 
 ```powershell
 npm run package:windows
-npm install -g ./dist-package/paper-system-atlas-0.1.0.tgz
+npm install -g ./dist-package/paper-system-atlas-0.2.0.tgz
 paper-atlas doctor
 ```
 
@@ -41,6 +41,18 @@ node dist/src/cli.js render `
   --formats svg,png,jpg,gif,excalidraw `
   --verify
 ```
+
+一次生成分层、泳道和径向三种布局，并输出横向对比拼图：
+
+```powershell
+paper-atlas preview `
+  --spec examples/intelligent-collaboration.json `
+  --outdir outputs/preview `
+  --basename collaboration `
+  --verify
+```
+
+单独控制布局集合可使用 `--layouts layered,radial`。预览命令默认输出 PNG 和 SVG，并始终保留用于对比拼图的 PNG。
 
 ## 文档一键生成
 
@@ -93,6 +105,18 @@ $env:PAPER_ATLAS_MODEL = '<模型名称>'
 - `adaptive`：默认自适应排版，适合任意分组、节点数量和三种布局。
 - `atlas-showcase`：四阶段分层图的高保真展示模板，固定采用 1674×941 参考构图，并补全双汇聚点、内部编排链、记忆与上下文、图例、批注、设计原则、罗盘和山景。所有内容仍为可编辑 SVG/Excalidraw 元素，不嵌入参考位图。
 
+`radial` 会生成可配置的中心枢纽。通过 `layout.hub` 设置标题、说明和颜色；未设置时使用图谱标题与副标题。跨分区连线会经过中心枢纽汇聚，组内连线仍保留直接关系。
+
+`decorations` 可以覆盖展示模板的内容层：
+
+- `principles`：右上角设计原则。
+- `legend`：图例名称与连线类型。
+- `support`：底部支撑系统标题与说明。
+- `callouts`：绑定到分区的叙事批注。
+- `compass`、`landscape`：控制装饰元素是否显示。
+
+连线的 `label` 会同步写入 SVG 与 Excalidraw，适合标注 API、事件、数据或人工动作。
+
 示例 `examples/intelligent-collaboration.json` 已启用 `atlas-showcase`；通过 CLI 使用 `--layout lanes` 或 `--layout radial` 时会自动回到 `adaptive`，以保持自动布局能力。
 
 AI Loop 测试示例同时展示两种配置：
@@ -100,6 +124,17 @@ AI Loop 测试示例同时展示两种配置：
 - `examples/ai-loop-atlas-showcase.json`：四阶段高保真展示图。
 - `examples/ai-loop-adaptive.json`：六阶段径向反馈闭环。
 
+## 质量检查
+
+`--verify` 除了检查文件、尺寸、GIF 帧数和 Excalidraw 结构，还会执行场景质量检查：
+
+- 节点与分区是否越界或重叠。
+- 径向枢纽是否侵入外围分区。
+- 连线是否穿过无关节点。
+- 文字截断风险、画布密度、超长路径和连线标签碰撞。
+
+结构性问题会令命令失败；可读性风险记录在 `warnings` 中，便于继续调整规格而不误判文件损坏。
+
 ## 当前状态
 
-当前为原创 MVP 开发版本，许可证与最终公开项目名称尚未确定。
+当前为原创 v0.2 开发版本，许可证与最终公开项目名称尚未确定。

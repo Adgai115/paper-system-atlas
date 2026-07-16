@@ -76,5 +76,26 @@
   "notes": [
     { "text": "中文优先 · 内容驱动布局", "anchor": "top-right", "color": "#CC654B" },
     { "text": "可编辑 SVG 与 Excalidraw", "anchor": "bottom-right", "color": "#3569A7" }
-  ]
+  ],
+  "decorations": {
+    "principles": ["以意图为先", "上下文丰富", "专家驱动", "可验证与安全", "人性回环中"],
+    "legend": [
+      { "kind": "signal", "label": "用户信号流" },
+      { "kind": "task", "label": "编排流程" },
+      { "kind": "task", "label": "专家任务流" },
+      { "kind": "result", "label": "结果输出流" },
+      { "kind": "feedback", "label": "上下文／反馈" },
+      { "kind": "port", "label": "端口／接口" },
+      { "kind": "storage", "label": "存储／记忆" }
+    ],
+    "support": { "title": "记忆与上下文", "description": "历史、偏好、知识图谱" },
+    "callouts": [
+      { "group": "input", "text": "捕捉一切，理解意图。", "color": "#CC654B" },
+      { "group": "orchestration", "text": "规划执行路径，路由时带上下文，验证结果。", "color": "#2D8585" },
+      { "group": "specialists", "text": "专家各司其职，并行、安全、可靠。", "color": "#3569A7" },
+      { "group": "delivery", "text": "以合适的形式，交付给合适的人，在正确的时间。", "color": "#CC654B" }
+    ],
+    "compass": true,
+    "landscape": true
+  }
 }

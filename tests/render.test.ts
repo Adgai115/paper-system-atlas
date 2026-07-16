@@ -7,7 +7,7 @@ import { parseAtlasSpec } from "../src/schema.js";
 import { buildScene } from "../src/layout.js";
 import { renderSvg } from "../src/svg.js";
 import { renderExcalidraw } from "../src/excalidraw.js";
-import { exportScene, verifyOutputs } from "../src/exporters.js";
+import { analyzeSceneQuality, exportScene, verifyOutputs } from "../src/exporters.js";
 import { paintMotionFrame } from "../src/motion.js";
 
 const exampleUrl = new URL("../examples/intelligent-collaboration.json", import.meta.url);
@@ -47,6 +47,22 @@ test("分层、泳道和径向布局都保持节点在所属分区内", async ()
       assert.ok(node.box.y + node.box.height <= group.box.y + group.box.height, `${mode}:${node.id}:bottom`);
     }
   }
+});
+
+test("径向布局生成中心枢纽且不与外围分区重叠", async () => {
+  const spec = structuredClone(await fixture());
+  spec.layout.mode = "radial";
+  spec.layout.profile = "adaptive";
+  spec.layout.hub = { title: "协作中枢", description: "统一路由与反馈" };
+  const scene = buildScene(spec);
+  assert.ok(scene.hub);
+  for (const group of scene.groups) {
+    const hubBox: { x: number; y: number; width: number; height: number } = scene.hub!.box;
+    const overlaps: boolean = hubBox.x < group.box.x + group.box.width && hubBox.x + hubBox.width > group.box.x && hubBox.y < group.box.y + group.box.height && hubBox.y + hubBox.height > group.box.y;
+    assert.equal(overlaps, false, `hub:${group.id}`);
+  }
+  assert.match(renderSvg(scene), /atlas-radial-hub/);
+  assert.ok(JSON.parse(renderExcalidraw(scene)).elements.some((element: { id: string }) => element.id === "atlas-radial-hub"));
 });
 
 test("三种布局的分区不重叠且连线避开非端点节点", async () => {
@@ -138,6 +154,26 @@ test("SVG 与 Excalidraw 保留中文内容和唯一元素 ID", async () => {
   assert.equal(ids.length, new Set(ids).size);
   assert.equal(indices.length, new Set(indices).size);
   assert.ok(excalidraw.elements.some((element: { text?: string }) => element.text === "系统图谱"));
+});
+
+test("连线标签会同时写入 SVG 与 Excalidraw", async () => {
+  const spec = structuredClone(await fixture());
+  spec.edges[0].label = "用户输入";
+  const scene = buildScene(spec);
+  const svg = renderSvg(scene);
+  const excalidraw = JSON.parse(renderExcalidraw(scene)) as { elements: Array<{ id: string; text?: string }> };
+  assert.match(svg, /用户输入/);
+  assert.ok(excalidraw.elements.some((element) => element.text === "用户输入"));
+});
+
+test("视觉质量分析区分结构错误与可读性风险", async () => {
+  const spec = structuredClone(await fixture());
+  const healthy = analyzeSceneQuality(buildScene(spec));
+  assert.ok(healthy.checks.every((check) => check.ok));
+  spec.nodes[0].description = "这是一个故意写得非常非常长并且会明显超过卡片可读容量的中文说明，用来验证质量报告能够发现潜在截断风险";
+  const crowded = analyzeSceneQuality(buildScene(spec));
+  const warning = crowded.warnings.find((item) => item.name === "text_clipping_risk");
+  assert.equal(warning?.ok, false);
 });
 
 test("轻量 GIF 动态层包含拖尾、光晕和节点响应", async () => {

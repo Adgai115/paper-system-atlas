@@ -6,18 +6,23 @@
 
 - `meta`: 标题、副标题、语言。
 - `canvas`: 宽度、高度、GIF 帧率与帧数。
-- `layout`: `layered`、`lanes` 或 `radial`，以及布局方向。
+- `layout`: `layered`、`lanes` 或 `radial`，以及布局方向；径向图可通过 `hub` 配置中心枢纽。
 - `theme`: 纸张色、墨色、调色板、字体、纹理和手绘强度。
 - `groups`: 两到八个语义分区，数组顺序决定主要阅读顺序。
 - `nodes`: 属于某个分区的内容节点。
 - `edges`: 节点之间的信号、任务、结果或反馈流。
 - `notes`: 画布边缘的简短编辑注释。
+- `decorations`: 展示模板的原则、图例、支撑系统、分区批注和装饰开关。
 
 ## 节点
 
 每个节点必须包含唯一 `id`、有效 `group` 和 `title`。`description` 应简短。可用图标：
 
 `chat`, `calendar`, `voice`, `document`, `target`, `plan`, `route`, `shield`, `browser`, `knowledge`, `code`, `media`, `report`, `message`, `dashboard`, `archive`, `memory`。
+
+## 连线
+
+`kind` 支持 `signal`、`task`、`result` 和 `feedback`。需要解释传输内容或动作时使用简短 `label`；渲染器会为标签创建纸张底色，并同步写入 SVG 与 Excalidraw。
 
 ## 主题
 
@@ -27,6 +32,6 @@
 
 - `layered`: 从左到右的架构层、处理链和文章解释图。
 - `lanes`: 多角色协作、职责泳道、状态流程。
-- `radial`: 中心平台与外围能力、生态或事件总线。
+- `radial`: 中心平台与外围能力、生态或事件总线。中心枢纽使用 `layout.hub.title`、`description` 和可选 `color`。
 
 优先通过分组和连线改变布局，不要在文案中塞入空格或换行来强行控制位置。

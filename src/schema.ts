@@ -49,6 +49,25 @@ const edgeSchema = z.object({
   kind: z.enum(["signal", "task", "result", "feedback"]).default("signal"),
 });
 
+const decorationsSchema = z.object({
+  principles: z.array(z.string().min(1).max(36)).max(6).optional(),
+  legend: z.array(z.object({
+    kind: z.enum(["signal", "task", "result", "feedback", "port", "storage"]),
+    label: z.string().min(1).max(18),
+  })).max(8).optional(),
+  support: z.object({
+    title: z.string().min(1).max(18),
+    description: z.string().max(48).optional(),
+  }).optional(),
+  callouts: z.array(z.object({
+    group: z.string().min(1),
+    text: z.string().min(1).max(56),
+    color: color.optional(),
+  })).max(8).optional(),
+  compass: z.boolean().optional(),
+  landscape: z.boolean().optional(),
+});
+
 export const atlasSpecSchema = z.object({
   $schema: z.string().optional(),
   meta: z.object({
@@ -62,6 +81,11 @@ export const atlasSpecSchema = z.object({
     mode: z.enum(["layered", "lanes", "radial"]).default("layered"),
     direction: z.enum(["horizontal", "vertical"]).default("horizontal"),
     profile: z.enum(["adaptive", "atlas-showcase"]).default("adaptive"),
+    hub: z.object({
+      title: z.string().min(1).max(24),
+      description: z.string().max(48).optional(),
+      color: color.optional(),
+    }).optional(),
   }).default({ mode: "layered", direction: "horizontal" }),
   theme: themeSchema.default({}),
   groups: z.array(groupSchema).min(2).max(8),
@@ -72,6 +96,7 @@ export const atlasSpecSchema = z.object({
     anchor: z.enum(["top-left", "top-right", "bottom-left", "bottom-right"]).optional(),
     color: color.optional(),
   })).max(12).optional(),
+  decorations: decorationsSchema.optional(),
 }).superRefine((spec, ctx) => {
   const groupIds = new Set<string>();
   for (const [index, group] of spec.groups.entries()) {
@@ -87,6 +112,9 @@ export const atlasSpecSchema = z.object({
   for (const [index, edge] of spec.edges.entries()) {
     if (!nodeIds.has(edge.from)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["edges", index, "from"], message: `连线起点不存在: ${edge.from}` });
     if (!nodeIds.has(edge.to)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["edges", index, "to"], message: `连线终点不存在: ${edge.to}` });
+  }
+  for (const [index, callout] of (spec.decorations?.callouts ?? []).entries()) {
+    if (!groupIds.has(callout.group)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["decorations", "callouts", index, "group"], message: `批注引用了不存在的分区: ${callout.group}` });
   }
 });
 

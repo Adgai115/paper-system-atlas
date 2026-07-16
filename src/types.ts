@@ -50,6 +50,25 @@ export interface AtlasNote {
   color?: string;
 }
 
+export interface AtlasDecorations {
+  principles?: string[];
+  legend?: Array<{
+    kind: "signal" | "task" | "result" | "feedback" | "port" | "storage";
+    label: string;
+  }>;
+  support?: {
+    title: string;
+    description?: string;
+  };
+  callouts?: Array<{
+    group: string;
+    text: string;
+    color?: string;
+  }>;
+  compass?: boolean;
+  landscape?: boolean;
+}
+
 export interface AtlasSpec {
   meta: {
     title: string;
@@ -62,12 +81,18 @@ export interface AtlasSpec {
     mode: LayoutMode;
     direction: "horizontal" | "vertical";
     profile?: "adaptive" | "atlas-showcase";
+    hub?: {
+      title: string;
+      description?: string;
+      color?: string;
+    };
   };
   theme: AtlasTheme;
   groups: AtlasGroup[];
   nodes: AtlasNode[];
   edges: AtlasEdge[];
   notes?: AtlasNote[];
+  decorations?: AtlasDecorations;
 }
 
 export interface Box {
@@ -92,11 +117,19 @@ export interface LayoutEdge extends AtlasEdge {
   path: [number, number][];
 }
 
+export interface LayoutHub {
+  title: string;
+  description?: string;
+  color: string;
+  box: Box;
+}
+
 export interface Scene {
   spec: AtlasSpec;
   groups: LayoutGroup[];
   nodes: LayoutNode[];
   edges: LayoutEdge[];
+  hub?: LayoutHub;
 }
 
 export interface RenderOptions {

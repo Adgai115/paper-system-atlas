@@ -30,6 +30,7 @@ const semanticSchema = z.object({
   edges: z.array(z.object({
     from: z.string().min(1),
     to: z.string().min(1),
+    label: z.string().min(1).max(18).nullable().optional(),
     kind: z.enum(["signal", "task", "result", "feedback"]),
     animated: z.boolean(),
   }).strict()).min(1).max(120),
@@ -132,6 +133,7 @@ export function semanticJsonSchema(profile: ComposerProfile): Record<string, unk
         type: "array", minItems: 1, maxItems: 120,
         items: strictObject({
           from: { type: "string" }, to: { type: "string" },
+          label: { anyOf: [{ type: "string", minLength: 1, maxLength: 18 }, { type: "null" }] },
           kind: { type: "string", enum: ["signal", "task", "result", "feedback"] },
           animated: { type: "boolean" },
         }),
@@ -203,7 +205,7 @@ function instructions(profile: ComposerProfile): string {
   const profileRules = profile === "atlas-showcase"
     ? "必须生成恰好 4 个语义分区，每区 2-4 个节点，优先每区 4 个节点；布局必须为 layered。按输入、处理、能力、交付的阅读顺序组织，但标题应忠于原文。"
     : "根据内容选择 layered、lanes 或 radial；使用 2-8 个分区。存在明显反馈闭环、中心平台或生态关系时优先 radial。";
-  return `你是 Paper System Atlas 的中文系统图谱编排器。把文章、流程或系统说明提取为严格的语义 JSON，不输出解释或 Markdown。\n${profileRules}\n规则：\n1. 中文优先，仅保留必要英文缩写。\n2. 标题短而明确，节点描述控制在一行到两行。\n3. 只建立真实依赖，反馈边仅用于重试、学习、记忆或验证闭环。\n4. id 使用简短英文 kebab-case 且全局唯一。\n5. 所有节点必须属于已有分区，所有连线必须引用已有节点。\n6. animated 只为需要表达动态信号的边设为 true；分区内部静态顺序可设为 false。\n7. 不生成坐标、颜色、字体或画布尺寸，它们由引擎统一注入。`;
+  return `你是 Paper System Atlas 的中文系统图谱编排器。把文章、流程或系统说明提取为严格的语义 JSON，不输出解释或 Markdown。\n${profileRules}\n规则：\n1. 中文优先，仅保留必要英文缩写。\n2. 标题短而明确，节点描述控制在一行到两行。\n3. 只建立真实依赖，反馈边仅用于重试、学习、记忆或验证闭环。\n4. id 使用简短英文 kebab-case 且全局唯一。\n5. 所有节点必须属于已有分区，所有连线必须引用已有节点。\n6. animated 只为需要表达动态信号的边设为 true；分区内部静态顺序可设为 false。\n7. label 只在连线动作或传输内容需要解释时填写短语，否则设为 null。\n8. 不生成坐标、颜色、字体或画布尺寸，它们由引擎统一注入。`;
 }
 
 function parseModelJson(text: string): unknown {
@@ -221,7 +223,12 @@ function assembleSpec(semantic: SemanticSpec, profile: ComposerProfile): AtlasSp
   return parseAtlasSpec({
     meta: { ...semantic.meta, language: "zh-CN" },
     canvas: { width: showcase ? 1674 : 1600, height: showcase ? 941 : mode === "radial" ? 1000 : 900, fps: 8, frames: 16 },
-    layout: { mode, direction: mode === "lanes" ? "vertical" : "horizontal", profile },
+    layout: {
+      mode,
+      direction: mode === "lanes" ? "vertical" : "horizontal",
+      profile,
+      hub: mode === "radial" ? { title: semantic.meta.title, description: semantic.meta.subtitle, color: palette[1] } : undefined,
+    },
     theme: {
       name: "paper-color", paper: "#F6EEDD", ink: "#243B56", mutedInk: "#5F625E", palette,
       titleFont: "STKaiti, KaiTi, serif", bodyFont: "STKaiti, KaiTi, Microsoft YaHei, Noto Sans CJK SC, serif",
@@ -229,8 +236,15 @@ function assembleSpec(semantic: SemanticSpec, profile: ComposerProfile): AtlasSp
     },
     groups,
     nodes: semantic.nodes,
-    edges: semantic.edges,
+    edges: semantic.edges.map(({ label, ...edge }) => label ? { ...edge, label } : edge),
     notes: semantic.notes.map((note, index) => ({ ...note, color: palette[index % palette.length] })),
+    decorations: showcase ? {
+      principles: semantic.notes.map((note) => note.text).slice(0, 5),
+      support: { title: "内容依据", description: semantic.meta.description },
+      callouts: semantic.groups.map((group, index) => ({ group: group.id, text: group.note, color: palette[index % palette.length] })),
+      compass: true,
+      landscape: true,
+    } : undefined,
   });
 }
 

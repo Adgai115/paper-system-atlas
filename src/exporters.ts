@@ -6,6 +6,7 @@ import type { AtlasSpec, Scene } from "./types.js";
 import { renderSvg } from "./svg.js";
 import { renderExcalidraw } from "./excalidraw.js";
 import { paintMotionFrame } from "./motion.js";
+import { buildScene } from "./layout.js";
 
 export type OutputFormat = "svg" | "png" | "jpg" | "gif" | "excalidraw";
 
@@ -21,6 +22,87 @@ export interface ExportResult {
   height: number;
   frames?: number;
   fps?: number;
+}
+
+interface QualityItem {
+  name: string;
+  ok: boolean;
+  detail?: unknown;
+}
+
+function overlaps(a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }, padding = 0): boolean {
+  return a.x < b.x + b.width + padding && a.x + a.width + padding > b.x && a.y < b.y + b.height + padding && a.y + a.height + padding > b.y;
+}
+
+function textUnits(value: string): number {
+  return [...value].reduce((sum, char) => sum + (/[^\x00-\xff]/.test(char) ? 1 : 0.56), 0);
+}
+
+function pathLength(points: [number, number][]): number {
+  let total = 0;
+  for (let index = 1; index < points.length; index += 1) total += Math.hypot(points[index][0] - points[index - 1][0], points[index][1] - points[index - 1][1]);
+  return total;
+}
+
+export function analyzeSceneQuality(scene: Scene): { checks: QualityItem[]; warnings: QualityItem[] } {
+  const checks: QualityItem[] = [];
+  const warnings: QualityItem[] = [];
+  const { width, height } = scene.spec.canvas;
+  const outside = scene.nodes.filter((node) => node.box.x < 0 || node.box.y < 0 || node.box.x + node.box.width > width || node.box.y + node.box.height > height).map((node) => node.id);
+  checks.push({ name: "scene_nodes_in_bounds", ok: outside.length === 0, detail: outside });
+
+  const nodeOverlaps: string[] = [];
+  for (let left = 0; left < scene.nodes.length; left += 1) for (let right = left + 1; right < scene.nodes.length; right += 1) {
+    if (overlaps(scene.nodes[left].box, scene.nodes[right].box, -1)) nodeOverlaps.push(`${scene.nodes[left].id}:${scene.nodes[right].id}`);
+  }
+  checks.push({ name: "scene_node_overlaps", ok: nodeOverlaps.length === 0, detail: nodeOverlaps.slice(0, 24) });
+
+  const groupOverlaps: string[] = [];
+  for (let left = 0; left < scene.groups.length; left += 1) for (let right = left + 1; right < scene.groups.length; right += 1) {
+    if (overlaps(scene.groups[left].box, scene.groups[right].box)) groupOverlaps.push(`${scene.groups[left].id}:${scene.groups[right].id}`);
+  }
+  checks.push({ name: "scene_group_overlaps", ok: groupOverlaps.length === 0, detail: groupOverlaps });
+
+  const hubOverlaps = scene.hub ? scene.groups.filter((group) => overlaps(scene.hub!.box, group.box)).map((group) => group.id) : [];
+  checks.push({ name: "scene_hub_clearance", ok: hubOverlaps.length === 0, detail: hubOverlaps });
+
+  const crossings = new Set<string>();
+  for (const edge of scene.edges) {
+    const obstacles = scene.nodes.filter((node) => node.id !== edge.from && node.id !== edge.to);
+    for (let segment = 1; segment < edge.path.length && crossings.size < 24; segment += 1) {
+      const from = edge.path[segment - 1];
+      const to = edge.path[segment];
+      const samples = Math.max(2, Math.ceil(Math.hypot(to[0] - from[0], to[1] - from[1]) / 8));
+      for (let sample = 1; sample < samples; sample += 1) {
+        const t = sample / samples;
+        const point = { x: from[0] + (to[0] - from[0]) * t, y: from[1] + (to[1] - from[1]) * t };
+        for (const obstacle of obstacles) if (point.x > obstacle.box.x && point.x < obstacle.box.x + obstacle.box.width && point.y > obstacle.box.y && point.y < obstacle.box.y + obstacle.box.height) crossings.add(`${edge.from}->${edge.to}:${obstacle.id}`);
+      }
+    }
+  }
+  checks.push({ name: "scene_edges_avoid_nodes", ok: crossings.size === 0, detail: [...crossings] });
+
+  const clippingRisk = scene.nodes.filter((node) => {
+    const titleCapacity = Math.max(6, (node.box.width - 88) / 15) * 2;
+    const descriptionCapacity = Math.max(7, (node.box.width - 86) / 10) * Math.max(1, Math.floor((node.box.height - 54) / 16) + 1);
+    return textUnits(node.title) > titleCapacity || textUnits(node.description ?? "") > descriptionCapacity;
+  }).map((node) => node.id);
+  warnings.push({ name: "text_clipping_risk", ok: clippingRisk.length === 0, detail: { count: clippingRisk.length, nodes: clippingRisk.slice(0, 24) } });
+
+  const density = scene.nodes.reduce((sum, node) => sum + node.box.width * node.box.height, 0) / (width * height);
+  warnings.push({ name: "canvas_density", ok: density <= 0.44, detail: Number(density.toFixed(3)) });
+
+  const diagonal = Math.hypot(width, height);
+  const longEdges = scene.edges.filter((edge) => pathLength(edge.path) > diagonal * 2.2).map((edge) => `${edge.from}->${edge.to}`);
+  warnings.push({ name: "long_edge_routes", ok: longEdges.length === 0, detail: longEdges.slice(0, 24) });
+
+  const labelCollisions = scene.edges.filter((edge) => edge.label).flatMap((edge) => {
+    const midpoint = edge.path[Math.floor(edge.path.length / 2)] ?? edge.path[0];
+    const box = { x: midpoint[0] - 70, y: midpoint[1] - 18, width: 140, height: 36 };
+    return scene.nodes.filter((node) => node.id !== edge.from && node.id !== edge.to && overlaps(box, node.box)).map((node) => `${edge.from}->${edge.to}:${node.id}`);
+  });
+  warnings.push({ name: "edge_label_collisions", ok: labelCollisions.length === 0, detail: labelCollisions.slice(0, 24) });
+  return { checks, warnings };
 }
 
 interface StaticRaster {
@@ -131,5 +213,7 @@ export async function verifyOutputs(result: ExportResult, spec: AtlasSpec): Prom
     checks.push({ name: "excalidraw_font", ok: text.every((item) => item.fontFamily === 5), detail: text.length });
     checks.push({ name: "excalidraw_no_embeds", ok: Object.keys(data.files).length === 0 });
   }
-  return { ok: checks.every((check) => check.ok), checks };
+  const quality = analyzeSceneQuality(buildScene(spec));
+  checks.push(...quality.checks);
+  return { ok: checks.every((check) => check.ok), checks, warnings: quality.warnings };
 }

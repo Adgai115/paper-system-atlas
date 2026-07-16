@@ -33,7 +33,17 @@
       "properties": {
         "mode": { "enum": ["layered", "lanes", "radial"], "default": "layered" },
         "direction": { "enum": ["horizontal", "vertical"], "default": "horizontal" },
-        "profile": { "enum": ["adaptive", "atlas-showcase"], "default": "adaptive" }
+        "profile": { "enum": ["adaptive", "atlas-showcase"], "default": "adaptive" },
+        "hub": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title"],
+          "properties": {
+            "title": { "type": "string", "minLength": 1, "maxLength": 24 },
+            "description": { "type": "string", "maxLength": 48 },
+            "color": { "$ref": "#/$defs/color" }
+          }
+        }
       }
     },
     "theme": {
@@ -114,6 +124,55 @@
           "anchor": { "enum": ["top-left", "top-right", "bottom-left", "bottom-right"] },
           "color": { "$ref": "#/$defs/color" }
         }
+      }
+    },
+    "decorations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "principles": {
+          "type": "array",
+          "maxItems": 6,
+          "items": { "type": "string", "minLength": 1, "maxLength": 36 }
+        },
+        "legend": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "label"],
+            "properties": {
+              "kind": { "enum": ["signal", "task", "result", "feedback", "port", "storage"] },
+              "label": { "type": "string", "minLength": 1, "maxLength": 18 }
+            }
+          }
+        },
+        "support": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title"],
+          "properties": {
+            "title": { "type": "string", "minLength": 1, "maxLength": 18 },
+            "description": { "type": "string", "maxLength": 48 }
+          }
+        },
+        "callouts": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["group", "text"],
+            "properties": {
+              "group": { "$ref": "#/$defs/id" },
+              "text": { "type": "string", "minLength": 1, "maxLength": 56 },
+              "color": { "$ref": "#/$defs/color" }
+            }
+          }
+        },
+        "compass": { "type": "boolean" },
+        "landscape": { "type": "boolean" }
       }
     }
   },

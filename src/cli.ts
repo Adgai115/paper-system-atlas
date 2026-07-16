@@ -9,6 +9,7 @@ import { parseAtlasSpec, formatValidationError } from "./schema.js";
 import { buildScene } from "./layout.js";
 import { exportScene, verifyOutputs, type OutputFormat } from "./exporters.js";
 import { composeDocument, createOpenAICompatibleClient, type ApiStyle, type ComposerProfile } from "./composer.js";
+import type { AtlasSpec, LayoutMode } from "./types.js";
 
 interface Args { _: string[]; [key: string]: string[] | string | boolean; }
 
@@ -56,11 +57,69 @@ async function renderCommand(args: Args): Promise<void> {
   if (report.ok === false) process.exitCode = 1;
 }
 
-function outputFormats(args: Args): OutputFormat[] {
-  const formats = String(args.formats ?? "svg,png,excalidraw").split(",").map((item) => item.trim()).filter(Boolean) as OutputFormat[];
+function outputFormats(args: Args, fallback = "svg,png,excalidraw"): OutputFormat[] {
+  const formats = String(args.formats ?? fallback).split(",").map((item) => item.trim()).filter(Boolean) as OutputFormat[];
   const supported = new Set<OutputFormat>(["svg", "png", "jpg", "gif", "excalidraw"]);
   for (const format of formats) if (!supported.has(format)) throw new Error(`不支持的格式: ${format}`);
   return formats;
+}
+
+function escapeXml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char]!);
+}
+
+async function createPreviewSheet(spec: AtlasSpec, previews: Array<{ layout: LayoutMode; png: string }>, target: string): Promise<void> {
+  const width = 1800;
+  const margin = 48;
+  const gap = 26;
+  const header = 112;
+  const thumbWidth = Math.floor((width - margin * 2 - gap * (previews.length - 1)) / previews.length);
+  const thumbHeight = Math.max(260, Math.round(thumbWidth * spec.canvas.height / spec.canvas.width));
+  const height = header + thumbHeight + margin;
+  const labels: Record<LayoutMode, string> = { layered: "分层", lanes: "泳道", radial: "径向" };
+  const composites: sharp.OverlayOptions[] = [];
+  for (const [index, preview] of previews.entries()) {
+    composites.push({
+      input: await sharp(preview.png).resize(thumbWidth, thumbHeight, { fit: "contain", background: spec.theme.paper }).png().toBuffer(),
+      left: margin + index * (thumbWidth + gap),
+      top: header,
+    });
+  }
+  const labelSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><text x="${margin}" y="48" fill="${spec.theme.ink}" font-family="Microsoft YaHei, sans-serif" font-size="28" font-weight="700">${escapeXml(spec.meta.title)} · 多布局预览</text>${previews.map((preview, index) => `<text x="${margin + index * (thumbWidth + gap) + thumbWidth / 2}" y="91" text-anchor="middle" fill="${spec.theme.mutedInk}" font-family="Microsoft YaHei, sans-serif" font-size="20">${labels[preview.layout]}</text>`).join("")}</svg>`;
+  composites.unshift({ input: Buffer.from(labelSvg), left: 0, top: 0 });
+  await sharp({ create: { width, height, channels: 4, background: spec.theme.paper } }).composite(composites).png({ compressionLevel: 9 }).toFile(target);
+}
+
+async function previewCommand(args: Args): Promise<void> {
+  const original = await loadSpec(required(args, "spec"));
+  const requested = String(args.layouts ?? "layered,lanes,radial").split(",").map((item) => item.trim()).filter(Boolean);
+  const supported = new Set<LayoutMode>(["layered", "lanes", "radial"]);
+  for (const layout of requested) if (!supported.has(layout as LayoutMode)) throw new Error(`不支持的预览布局: ${layout}`);
+  const layouts = [...new Set(requested)] as LayoutMode[];
+  if (layouts.length === 0) throw new Error("--layouts 至少需要一个布局");
+  const outdir = path.resolve(required(args, "outdir"));
+  const basename = typeof args.basename === "string" ? args.basename : path.parse(required(args, "spec")).name;
+  const formats = outputFormats(args, "png,svg");
+  if (!formats.includes("png")) formats.push("png");
+  const layoutDir = path.join(outdir, "layouts");
+  const previews: Array<{ layout: LayoutMode; png: string }> = [];
+  const results: Record<string, unknown> = {};
+  for (const layout of layouts) {
+    const spec = structuredClone(original);
+    spec.layout.mode = layout;
+    spec.layout.direction = layout === "lanes" ? "vertical" : "horizontal";
+    if (layout !== "layered" || spec.groups.length !== 4) spec.layout.profile = "adaptive";
+    const result = await exportScene(buildScene(spec), { outdir: layoutDir, basename: `${basename}-${layout}`, formats });
+    const verification = args.verify ? await verifyOutputs(result, spec) : undefined;
+    results[layout] = verification ? { result, verification } : result;
+    previews.push({ layout, png: result.files.png! });
+  }
+  await mkdir(outdir, { recursive: true });
+  const sheet = path.join(outdir, `${basename}-preview.png`);
+  await createPreviewSheet(original, previews, sheet);
+  const ok = Object.values(results).every((item) => !("verification" in (item as Record<string, unknown>)) || ((item as { verification: { ok: boolean } }).verification.ok));
+  console.log(JSON.stringify({ ok, layouts, sheet, results }, null, 2));
+  if (!ok) process.exitCode = 1;
 }
 
 async function composeCommand(args: Args): Promise<void> {
@@ -128,7 +187,7 @@ async function doctorCommand(): Promise<void> {
 }
 
 function usage(): void {
-  console.log(`纸上系统图谱 CLI\n\n命令:\n  compose  将 Markdown/TXT 文档编排为规格并生成全部图像\n  render   根据规格生成 SVG/PNG/JPG/GIF/Excalidraw，可用 --layout 覆盖布局\n  validate 校验规格\n  doctor   检查 Windows 与运行环境\n\n模型环境变量:\n  PAPER_ATLAS_API_KEY   模型密钥（也支持 OPENAI_API_KEY）\n  PAPER_ATLAS_MODEL     模型名称（也支持 OPENAI_MODEL）\n  PAPER_ATLAS_BASE_URL  API 根地址，默认 https://api.openai.com/v1\n  PAPER_ATLAS_API_STYLE responses 或 chat-completions\n\n示例:\n  paper-atlas compose --input article.md --profile atlas-showcase --outdir outputs --basename article-map --formats svg,png,jpg,gif,excalidraw\n  paper-atlas render --spec examples/intelligent-collaboration.json --outdir outputs --basename demo --layout radial --formats svg,png,jpg,gif,excalidraw --verify`);
+  console.log(`纸上系统图谱 CLI\n\n命令:\n  compose  将 Markdown/TXT 文档编排为规格并生成全部图像\n  render   根据规格生成 SVG/PNG/JPG/GIF/Excalidraw，可用 --layout 覆盖布局\n  preview  一次生成多种布局并输出对比拼图\n  validate 校验规格\n  doctor   检查 Windows 与运行环境\n\n模型环境变量:\n  PAPER_ATLAS_API_KEY   模型密钥（也支持 OPENAI_API_KEY）\n  PAPER_ATLAS_MODEL     模型名称（也支持 OPENAI_MODEL）\n  PAPER_ATLAS_BASE_URL  API 根地址，默认 https://api.openai.com/v1\n  PAPER_ATLAS_API_STYLE responses 或 chat-completions\n\n示例:\n  paper-atlas compose --input article.md --profile atlas-showcase --outdir outputs --basename article-map --formats svg,png,jpg,gif,excalidraw\n  paper-atlas render --spec examples/intelligent-collaboration.json --outdir outputs --basename demo --layout radial --formats svg,png,jpg,gif,excalidraw --verify\n  paper-atlas preview --spec examples/intelligent-collaboration.json --outdir outputs/preview --basename demo --verify`);
 }
 
 async function main(): Promise<void> {
@@ -137,6 +196,7 @@ async function main(): Promise<void> {
   if (!command || command === "help" || args.help) { usage(); return; }
   if (command === "compose") await composeCommand(args);
   else if (command === "render") await renderCommand(args);
+  else if (command === "preview") await previewCommand(args);
   else if (command === "validate") await validateCommand(args);
   else if (command === "doctor") await doctorCommand();
   else throw new Error(`未知命令: ${command}`);

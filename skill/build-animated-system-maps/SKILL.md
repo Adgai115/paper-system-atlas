@@ -18,6 +18,8 @@ Turn source material into a semantic system-map specification, then render verif
 7. Inspect the PNG visually. Fix overlapping routes, cramped text, weak hierarchy, or ambiguous flow in the specification and rerender.
 8. Deliver SVG and Excalidraw as editable sources plus the requested raster or animated formats.
 
+When layout choice is uncertain, run `paper-atlas preview` first. It renders layered, lanes, and radial variants plus a single comparison sheet; select the clearest result before producing expensive GIF output.
+
 ## Content Rules
 
 - Describe meaning in the specification; do not assign pixel coordinates.
@@ -54,6 +56,16 @@ For an existing semantic specification:
   -Verify
 ```
 
+For a multi-layout comparison:
+
+```powershell
+paper-atlas preview `
+  --spec <spec.json> `
+  --outdir <output-directory> `
+  --basename <descriptive-name> `
+  --verify
+```
+
 The wrapper uses the repository CLI when present and falls back to a globally installed `paper-atlas` command.
 
 For a compact deployment without the source repository, install the generated runtime archive globally, then unpack `build-animated-system-maps-skill.zip` into the Codex skills directory:
@@ -73,3 +85,4 @@ The GIF exporter caches the static paper scene and paints only moving signal tra
 - Confirm Excalidraw IDs are unique, text uses `fontFamily: 5`, and `files` is empty.
 - Ensure Chinese glyphs render correctly on the current machine.
 - Do not deliver a diagram with clipped text, crossing through node bodies, or unreadable labels.
+- Review the `warnings` array for truncation risk, high density, long routes, and edge-label collisions even when structural verification passes.

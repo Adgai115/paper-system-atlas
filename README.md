@@ -9,7 +9,7 @@
 
 ## 效果预览
 
-![Paper System Atlas 生成的 AI 循环图谱](design/showcase-ai-loop.png)
+![Paper System Atlas 生成的 AI 循环图谱动画](design/showcase-ai-loop.gif)
 
 ## 快速开始
 
